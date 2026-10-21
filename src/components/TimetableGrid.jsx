@@ -48,7 +48,7 @@ function ClassCard({ e, mode, lk }) {
   return (
     <div className={`h-full rounded-lg border px-2.5 py-2 text-left ${lk.color(e.subjectId)}`}>
       <div className="flex items-start justify-between gap-1">
-        <span className="font-semibold leading-snug">{sub?.name ?? '?'}</span>
+        <span className="font-semibold leading-snug hyphens-auto [overflow-wrap:anywhere]">{sub?.name ?? "?"}</span>
         {e.kind === 'lab' && (
           <span className="shrink-0 rounded bg-white/70 px-1.5 text-xs font-bold uppercase">
             Lab{mode === 'section' && e.group ? ` ${e.group}` : ''}
@@ -106,9 +106,10 @@ export default function TimetableGrid({ data, entries, mode = 'section' }) {
       const span = block.end - block.start
       for (let k = 1; k < span; k++) covered.add(`${d}|${p + k}`)
       return (
-        <td key={d} rowSpan={span} className="relative align-top">
-          {/* Absolute fill so multi-period classes stretch over every row they span. */}
-          <div className="absolute inset-0 flex flex-col gap-1">
+        <td key={d} rowSpan={span} className="relative h-full align-top">
+          {/* Multi-period blocks use an absolute fill so they stretch over every row they span;
+              single-period cells stay in normal flow so the row grows to fit larger text. */}
+          <div className={`flex flex-col gap-1 ${span > 1 ? 'absolute inset-0' : 'h-full'}`}>
             {block.items.map((e, i) => (
               <div key={i} className="min-h-0 flex-1 overflow-hidden">
                 <ClassCard e={e} mode={mode} lk={lk} />
@@ -119,7 +120,7 @@ export default function TimetableGrid({ data, entries, mode = 'section' }) {
       )
     })
     rows.push(
-      <tr key={p} className="h-24">
+      <tr key={p} className="h-28">
         <th className="whitespace-nowrap px-2 text-left align-top">
           <div className="font-semibold text-slate-700">{periods[p].label}</div>
           <div className="text-sm font-normal text-slate-400">Period {p + 1}</div>

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useCollegeData } from './hooks/useCollegeData.js'
+import { usePrefs } from './hooks/usePrefs.js'
+import PrefsControls from './components/PrefsControls.jsx'
 import Landing from './pages/Landing.jsx'
 import { Button } from './components/ui.jsx'
 import AdminWizard from './pages/admin/AdminWizard.jsx'
@@ -22,6 +24,8 @@ function readRole() {
 export default function App() {
   const college = useCollegeData()
   const [view, setView] = useState(readRole)
+  const [prefs, setPrefs] = usePrefs()
+  const prefsControls = <PrefsControls prefs={prefs} setPrefs={setPrefs} />
 
   useEffect(() => {
     try {
@@ -32,25 +36,29 @@ export default function App() {
   }, [view])
 
   if (view === 'landing') {
-    return <Landing onSelect={setView} hasData={college.data.sections.length > 0} />
+    return <Landing onSelect={setView} hasData={college.data.sections.length > 0} controls={prefsControls} />
   }
 
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-indigo-600">Timetable</span>
-            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3">
+          <button onClick={() => setView('landing')} className="flex items-center gap-2">
+            <span className="grid h-9 w-9 place-items-center rounded-lg bg-indigo-600 text-lg text-white">🗓️</span>
+            <span className="text-lg font-bold">Timetable</span>
+            <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-sm font-medium text-indigo-700">
               {ROLE_LABELS[view]}
             </span>
+          </button>
+          <div className="flex items-center gap-2">
+            {prefsControls}
+            <Button variant="secondary" onClick={() => setView('landing')}>
+              Switch role
+            </Button>
           </div>
-          <Button variant="ghost" onClick={() => setView('landing')}>
-            Switch role
-          </Button>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main className="mx-auto max-w-7xl px-4 py-6">
         {view === 'admin' && <AdminPage college={college} />}
         {view === 'hod' && <TimetableViews data={college.data} withDepartmentFilter />}
         {view === 'faculty' && <FacultyView data={college.data} />}
