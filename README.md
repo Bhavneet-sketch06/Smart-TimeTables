@@ -17,6 +17,15 @@ from public documents on cse.gndec.ac.in: the July–Dec 2026 subject allotment,
 (08:30–17:30, lunch 12:30–13:30, labs in half-groups A1/A2) and the room/lab infrastructure lists. It generates in
 well under a second with zero clashes. It is a realistic sample, **not** the official GNDEC timetable.
 
+## AI timetable assistant
+The **Ask AI** button (bottom-right of every app screen) answers questions about the current timetable, e.g.
+"When is D3 CS A free on Wednesday?". It calls `api/chat.js`, which uses Claude (`claude-opus-5-5`) on the server so
+the API key is never sent to the browser.
+
+1. Copy `.env.example` to `.env.local` and set `ANTHROPIC_API_KEY=...` (get a key at https://console.anthropic.com).
+2. Restart `npm run dev`.
+3. On Vercel: Project → Settings → Environment Variables → add `ANTHROPIC_API_KEY`, then redeploy.
+
 ## Roles
 - **Administrator**: 5-step setup wizard (time structure → rooms → subjects → teachers → sections), then generate and review.
 - **HOD / Coordinator**: timetables by section, teacher or room, filtered by department, with clash count and quality score.

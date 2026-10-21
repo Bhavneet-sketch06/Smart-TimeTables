@@ -1,7 +1,9 @@
+import { Monitor, Moon, Sun } from 'lucide-react'
+
 const THEMES = [
-  { id: 'light', icon: '☀️', label: 'Light theme' },
-  { id: 'dark', icon: '🌙', label: 'Dark theme' },
-  { id: 'system', icon: '💻', label: 'Match system theme' },
+  { id: 'light', Icon: Sun, label: 'Light theme' },
+  { id: 'dark', Icon: Moon, label: 'Dark theme' },
+  { id: 'system', Icon: Monitor, label: 'Match system theme' },
 ]
 
 const SIZES = [
@@ -35,7 +37,12 @@ function Segmented({ items, value, onChange, render }) {
 export default function PrefsControls({ prefs, setPrefs }) {
   return (
     <div className="flex items-center gap-2">
-      <Segmented items={THEMES} value={prefs.theme} onChange={(theme) => setPrefs({ theme })} render={(t) => t.icon} />
+      <Segmented
+        items={THEMES}
+        value={prefs.theme}
+        onChange={(theme) => setPrefs({ theme })}
+        render={({ Icon }) => <Icon className="h-4 w-4 text-slate-700" />}
+      />
       <Segmented
         items={SIZES}
         value={prefs.textSize}

@@ -1,0 +1,69 @@
+import { periodTimes } from '../data/schema.js'
+
+/**
+ * Compact plain-text description of the college data and generated timetable, sent to the assistant.
+ * Must be deterministic (no timestamps) so the server-side prompt cache is reused across turns.
+ */
+export function buildTimetableContext(data) {
+  const byId = (list) => new Map(list.map((x) => [x.id, x]))
+  const subjects = byId(data.subjects)
+  const teachers = byId(data.teachers)
+  const rooms = byId(data.rooms)
+  const { periods, breakSlot } = periodTimes(data.time)
+  const lines = []
+
+  lines.push(`College: ${data.meta?.name ?? 'Custom college data'}`)
+  if (data.meta?.note) lines.push(`Note: ${data.meta.note}`)
+  lines.push(`Working days: ${data.time.days.join(', ')}`)
+  lines.push(`Periods: ${periods.map((p, i) => `P${i + 1} ${p.label}`).join('; ')}`)
+  if (breakSlot) lines.push(`Break: ${breakSlot.label} (after P${data.time.breakAfter})`)
+
+  lines.push('', 'ROOMS')
+  for (const r of data.rooms) lines.push(`- ${r.name}: ${r.type}, ${r.capacity} seats`)
+
+  lines.push('', 'TEACHERS')
+  for (const t of data.teachers) {
+    const off = t.unavailable?.length ? `; unavailable ${t.unavailable.join(', ')}` : ''
+    lines.push(`- ${t.name} (${t.department || 'no department'}); max ${t.maxHours} h/week${off}`)
+  }
+
+  lines.push('', 'SUBJECTS')
+  for (const s of data.subjects) {
+    const lab = s.labHours ? `, lab ${s.labSessions > 1 ? `${s.labSessions} x ` : ''}${s.labHours} periods per group` : ''
+    lines.push(`- ${s.name}${s.code ? ` (${s.code})` : ''}: ${s.lectureHours} lectures/week${lab}`)
+  }
+
+  lines.push('', 'SECTIONS')
+  for (const sec of data.sections) {
+    const groups = sec.labGroups > 1 ? `, lab groups ${(sec.groupNames || []).join('/') || sec.labGroups}` : ''
+    lines.push(`- ${sec.name} (${sec.department || 'no department'}), ${sec.students} students${groups}`)
+    for (const a of sec.assignments) {
+      const lab = a.labTeacherId ? `; lab by ${teachers.get(a.labTeacherId)?.name}` : ''
+      lines.push(`    ${subjects.get(a.subjectId)?.name ?? '?'}: ${teachers.get(a.teacherId)?.name ?? 'no teacher'}${lab}`)
+    }
+  }
+
+  const tt = data.timetable
+  if (!tt) {
+    lines.push('', 'TIMETABLE: not generated yet. The administrator can generate it from Setup > Sections > Generate timetable.')
+    return lines.join('\n')
+  }
+
+  lines.push('', `TIMETABLE: ${tt.stats.placed}/${tt.stats.total} classes placed, ${tt.stats.clashes} clashes, quality ${tt.stats.quality}/100`)
+  if (tt.reason) lines.push(`Incomplete because: ${tt.reason}`)
+  const time = (e) => `${periods[e.period]?.start}-${periods[e.period + e.length - 1]?.end}`
+  for (const sec of data.sections) {
+    lines.push('', `## ${sec.name}`)
+    data.time.days.forEach((day, d) => {
+      const today = tt.entries
+        .filter((e) => e.sectionId === sec.id && e.day === d)
+        .sort((a, b) => a.period - b.period || (a.group ?? '').localeCompare(b.group ?? ''))
+      const text = today.map((e) => {
+        const what = `${subjects.get(e.subjectId)?.name ?? '?'} ${e.kind === 'lab' ? `lab${e.group ? ` (group ${e.group})` : ''}` : 'lecture'}`
+        return `${time(e)} ${what}, ${teachers.get(e.teacherId)?.name ?? '?'}, ${rooms.get(e.roomId)?.name ?? '?'}`
+      })
+      lines.push(`${day}: ${text.length ? text.join(' | ') : 'no classes'}`)
+    })
+  }
+  return lines.join('\n')
+}

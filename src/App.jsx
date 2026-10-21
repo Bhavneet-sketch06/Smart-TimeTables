@@ -3,7 +3,9 @@ import { useCollegeData } from './hooks/useCollegeData.js'
 import { usePrefs } from './hooks/usePrefs.js'
 import PrefsControls from './components/PrefsControls.jsx'
 import Landing from './pages/Landing.jsx'
+import { CalendarDays } from 'lucide-react'
 import { Button } from './components/ui.jsx'
+import ChatWidget from './components/ChatWidget.jsx'
 import AdminWizard from './pages/admin/AdminWizard.jsx'
 import TimetableViews from './pages/TimetableViews.jsx'
 import FacultyView from './pages/FacultyView.jsx'
@@ -42,9 +44,11 @@ export default function App() {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-3">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6 lg:px-8">
           <button onClick={() => setView('landing')} className="flex items-center gap-2">
-            <span className="grid h-9 w-9 place-items-center rounded-lg bg-indigo-600 text-lg text-white">🗓️</span>
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-600 text-white">
+              <CalendarDays className="h-5 w-5" />
+            </span>
             <span className="text-lg font-bold">Timetable</span>
             <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-sm font-medium text-indigo-700">
               {ROLE_LABELS[view]}
@@ -58,12 +62,13 @@ export default function App() {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-6">
+      <main className="w-full px-4 py-6 sm:px-6 lg:px-8">
         {view === 'admin' && <AdminPage college={college} />}
         {view === 'hod' && <TimetableViews data={college.data} withDepartmentFilter />}
         {view === 'faculty' && <FacultyView data={college.data} />}
         {view === 'student' && <StudentView data={college.data} />}
       </main>
+      <ChatWidget data={college.data} />
     </div>
   )
 }

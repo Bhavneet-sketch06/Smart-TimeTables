@@ -166,7 +166,7 @@ export default function TimetableGrid({ data, entries, mode = 'section' }) {
       )
     })
     rows.push(
-      <tr key={p} className="h-28">
+      <tr key={p} className="h-32">
         <th className="whitespace-nowrap px-2 text-left align-top">
           <div className="font-semibold text-slate-700">{periods[p].label}</div>
           <div className="text-sm font-normal text-slate-400">Period {p + 1}</div>

@@ -3,7 +3,10 @@
 Browser-only timetable generator for any college. No backend: all data lives in localStorage. Deployed as a static site on Vercel. Built as a 120-minute hackathon prototype.
 
 ## Stack
-- React 18 + Vite 5
+- React 18 + Vite 5, lucide-react icons
+- AI assistant: `api/chat.js` (Vercel serverless function, `@anthropic-ai/sdk`, model `claude-opus-5-5`),
+  served locally by a Vite dev middleware in `vite.config.js`. Key: `ANTHROPIC_API_KEY` in `.env.local` / Vercel env.
+  Never expose the key to the browser (no `VITE_` prefix, never import the SDK in `src/`).
 - Tailwind CSS v4 via `@tailwindcss/vite` (no `tailwind.config.js` / PostCSS config)
 - Vitest for tests (configured in `vite.config.js`, Node environment)
 - No router: `App.jsx` holds a `view` state (`landing | admin | hod | faculty | student`)
@@ -17,12 +20,15 @@ npm run test:watch # vitest watch mode
 npm run build      # production build to dist/
 npm run preview    # serve dist/ locally
 ```
-Vercel: framework preset "Vite", build `npm run build`, output `dist`. No `vercel.json` needed.
+Vercel: framework preset "Vite", build `npm run build`, output `dist`. No `vercel.json` needed; `api/` is
+deployed as serverless functions automatically. Set `ANTHROPIC_API_KEY` in Project Settings → Environment Variables.
 
 ## Folder structure
 ```
+api/chat.js                      # assistant endpoint: validates input, streams Claude's answer as plain text
 src/
   main.jsx, App.jsx, index.css   # entry, view switcher, Tailwind import
+  chat/timetableContext.js       # data + timetable -> compact deterministic text for the assistant (cached)
   scheduler.js                   # PURE JS: precheck, generateTimetable, findClashes, scoreQuality
   scheduler.test.js              # runs scheduler on demo data, asserts zero clashes
   data/
@@ -32,7 +38,7 @@ src/
   hooks/useCollegeData.js        # localStorage-backed state (key `ttgen:v1`)
   hooks/usePrefs.js              # theme (light/dark/system) + text size (key `ttgen:prefs`)
   theme-dark.css                 # GENERATED: dark theme flips Tailwind colour scales under `.dark`
-  components/                    # TimetableGrid (days across, times down), SummaryPanel, PrefsControls, ui bits
+  components/                    # TimetableGrid (days across, times down), SummaryPanel, PrefsControls, ChatWidget, ui bits
   pages/
     Landing.jsx                  # role selector
     admin/                       # setup wizard: Time → Rooms → Subjects → Teachers → Sections
