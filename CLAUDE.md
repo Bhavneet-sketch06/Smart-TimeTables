@@ -32,7 +32,8 @@ src/
   components/                    # TimetableGrid, SummaryPanel, shared ui bits
   pages/
     Landing.jsx                  # role selector
-    admin/                       # setup wizard: Time → Rooms → Teachers → Subjects → Sections
+    admin/                       # setup wizard: Time → Rooms → Subjects → Teachers → Sections
+                                 # (subjects before teachers so "can teach" has options); listUtils.js helpers
     TimetableViews.jsx           # section / teacher / room tabs + summary (Admin, HOD)
     FacultyView.jsx, StudentView.jsx
 ```
@@ -56,7 +57,8 @@ Timetable entry: `{ sectionId, subjectId, teacherId, roomId, day, period, length
 3. Units ordered most-constrained first (labs, then fewest candidate slots).
 4. Backtracking with busy grids for teacher / room / section; hard constraints: no double-booking, room capacity & type, labs consecutive and not crossing the break, teacher unavailability.
 5. Candidates sorted by soft score (spread a subject across days, avoid > 3 back-to-back periods for a teacher).
-6. Step limit + random restarts; on failure returns a plain-language `reason`.
+6. Step limit + random restarts + time budget (`timeLimitMs`, default 4000); on failure returns a plain-language `reason`.
+   Identical units (same section/subject/kind) share a `group` and are placed in order to avoid symmetric thrashing.
 7. `findClashes(entries, data)` is an independent verifier used by the UI and the test.
 
 ## Conventions
@@ -65,4 +67,7 @@ Timetable entry: `{ sectionId, subjectId, teacherId, roomId, day, period, length
 - Unavailable-slot key format: `"<DayName>-<period>"` with 1-based period, e.g. `"Mon-1"`.
 - Styling with Tailwind utility classes only; `index.css` contains just the Tailwind import.
 - Keep components small and functional; state flows from `useCollegeData` in `App.jsx` via props.
+- Other localStorage keys (`ttgen:role`, `ttgen:student`, `ttgen:faculty`) are per-viewer conveniences only; wrap all storage access in try/catch.
+- Editing any input through `update()` clears the stored timetable (it would be stale).
 - Build in small steps; commit after each working step. Run `npm test` and `npm run build` before committing.
+- `.claude/launch.json` defines the `dev` preview server (port 5173).
