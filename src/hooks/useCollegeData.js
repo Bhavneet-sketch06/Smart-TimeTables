@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { STORAGE_KEY, emptyCollege } from '../data/schema.js'
 import { demoCollege } from '../data/demoCollege.js'
+import { gndecCse } from '../data/gndecCse.js'
 
 function load() {
   try {
@@ -32,6 +33,7 @@ export function useCollegeData() {
     update,
     setTimetable: (timetable) => setData((d) => ({ ...d, timetable })),
     loadDemo: () => setData(demoCollege()),
+    loadGndec: () => setData(gndecCse()),
     reset: () => setData(emptyCollege()),
   }
 }

@@ -10,6 +10,10 @@
  *           labHours = length of one lab block in consecutive periods (0 = no lab)
  * sections: { id, name, department, students, assignments: { subjectId, teacherId }[] }
  * timetable: null | { entries, stats, generatedAt }
+ * meta:     null | { name, note }   where the data came from (shown in the UI)
+ * sections may also have labGroups (e.g. 2) and groupNames (e.g. ['A1', 'A2']); labs then run per group.
+ * subjects may have labSessions (lab blocks per group per week, default 1);
+ * assignments may have labTeacherId when the lab is taught by someone else.
  */
 
 export const STORAGE_KEY = 'ttgen:v1'
@@ -24,6 +28,7 @@ export function uid(prefix = 'id') {
 
 export function emptyCollege() {
   return {
+    meta: null,
     time: { ...DEFAULT_TIME },
     rooms: [],
     teachers: [],

@@ -42,13 +42,26 @@ function detailLines(e, mode, lk) {
   return [teacher, room]
 }
 
-function ClassCard({ e, mode, lk }) {
+function ClassCard({ e, mode, lk, compact = false }) {
   const sub = lk.subjects.get(e.subjectId)
   const [a, b] = detailLines(e, mode, lk)
+  if (compact) {
+    // Narrow lane next to a parallel lab group: badge on top, smaller text.
+    return (
+      <div className={`h-full rounded-lg border px-2 py-1.5 text-left text-sm ${lk.color(e.subjectId)}`}>
+        <span className="mb-0.5 inline-block rounded bg-white/70 px-1.5 text-xs font-bold uppercase">
+          {e.kind === 'lab' ? 'Lab' : ''} {mode === 'section' ? e.group : ''}
+        </span>
+        <div className="font-semibold leading-tight hyphens-auto break-words">{sub?.name ?? '?'}</div>
+        <div className="mt-0.5 leading-tight opacity-85">{a}</div>
+        <div className="leading-tight opacity-85">{b}</div>
+      </div>
+    )
+  }
   return (
     <div className={`h-full rounded-lg border px-2.5 py-2 text-left ${lk.color(e.subjectId)}`}>
       <div className="flex items-start justify-between gap-1">
-        <span className="font-semibold leading-snug hyphens-auto [overflow-wrap:anywhere]">{sub?.name ?? "?"}</span>
+        <span className="font-semibold leading-snug hyphens-auto break-words">{sub?.name ?? "?"}</span>
         {e.kind === 'lab' && (
           <span className="shrink-0 rounded bg-white/70 px-1.5 text-xs font-bold uppercase">
             Lab{mode === 'section' && e.group ? ` ${e.group}` : ''}
@@ -57,6 +70,39 @@ function ClassCard({ e, mode, lk }) {
       </div>
       <div className="mt-1 text-sm leading-snug opacity-85">{a}</div>
       <div className="text-sm leading-snug opacity-85">{b}</div>
+    </div>
+  )
+}
+
+/**
+ * A multi-period cell. Classes that overlap (lab groups running side by side) get their own lane,
+ * and each card sits on the exact rows of its periods.
+ */
+function BlockLanes({ block, span, mode, lk }) {
+  const laneEnds = []
+  const placed = block.items.map((e) => {
+    let lane = laneEnds.findIndex((end) => end <= e.period)
+    if (lane === -1) lane = laneEnds.push(0) - 1
+    laneEnds[lane] = e.period + e.length
+    return { e, lane }
+  })
+  return (
+    <div
+      className="absolute inset-0 grid gap-1"
+      style={{
+        gridTemplateRows: `repeat(${span}, minmax(0, 1fr))`,
+        gridTemplateColumns: `repeat(${laneEnds.length}, minmax(0, 1fr))`,
+      }}
+    >
+      {placed.map(({ e, lane }, i) => (
+        <div
+          key={i}
+          className="min-h-0 overflow-hidden"
+          style={{ gridRow: `${e.period - block.start + 1} / span ${e.length}`, gridColumn: lane + 1 }}
+        >
+          <ClassCard e={e} mode={mode} lk={lk} compact={laneEnds.length > 1} />
+        </div>
+      ))}
     </div>
   )
 }
@@ -109,13 +155,13 @@ export default function TimetableGrid({ data, entries, mode = 'section' }) {
         <td key={d} rowSpan={span} className="relative h-full align-top">
           {/* Multi-period blocks use an absolute fill so they stretch over every row they span;
               single-period cells stay in normal flow so the row grows to fit larger text. */}
-          <div className={`flex flex-col gap-1 ${span > 1 ? 'absolute inset-0' : 'h-full'}`}>
-            {block.items.map((e, i) => (
-              <div key={i} className="min-h-0 flex-1 overflow-hidden">
-                <ClassCard e={e} mode={mode} lk={lk} />
-              </div>
-            ))}
-          </div>
+          {span > 1 ? (
+            <BlockLanes block={block} span={span} mode={mode} lk={lk} />
+          ) : (
+            <div className="h-full">
+              <ClassCard e={block.items[0]} mode={mode} lk={lk} />
+            </div>
+          )}
         </td>
       )
     })

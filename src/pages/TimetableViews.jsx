@@ -10,6 +10,17 @@ const TABS = [
   { id: 'room', label: 'By room', list: 'rooms', key: 'roomId' },
 ]
 
+/** Shows where the loaded data came from (e.g. the GNDEC source note). */
+export function DataNote({ data }) {
+  if (!data.meta) return null
+  return (
+    <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-indigo-900">
+      <span className="font-semibold">{data.meta.name}</span>
+      {data.meta.note && <span className="text-indigo-700"> · {data.meta.note}</span>}
+    </div>
+  )
+}
+
 export function NoTimetable() {
   return <EmptyState>No timetable has been generated yet. The administrator can generate one from the setup wizard.</EmptyState>
 }
@@ -26,10 +37,13 @@ export default function TimetableViews({ data, withDepartmentFilter = false }) {
   const options = data[current.list].filter(inDept)
   const id = options.some((o) => o.id === selected[tab]) ? selected[tab] : options[0]?.id
   const entries = data.timetable.entries.filter((e) => e[current.key] === id)
-  const periods = entries.reduce((n, e) => n + e.length, 0)
+  // Count distinct busy slots so lab groups running side by side aren't counted twice.
+  const busy = new Set(entries.flatMap((e) => Array.from({ length: e.length }, (_, k) => `${e.day}|${e.period + k}`)))
+  const periods = busy.size
 
   return (
     <div className="space-y-4">
+      <DataNote data={data} />
       <SummaryPanel data={data} />
       <Card className="space-y-4">
         <div className="flex flex-wrap items-end gap-3">

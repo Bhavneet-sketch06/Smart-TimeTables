@@ -68,6 +68,7 @@ const sections = [
 export function demoCollege() {
   // Deep copy so edits in the UI never mutate these module constants.
   return structuredClone({
+    meta: { name: 'Demo college', note: 'Sample data for trying out the generator.' },
     time: {
       days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
       periodsPerDay: 7,

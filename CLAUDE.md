@@ -26,10 +26,13 @@ src/
   scheduler.js                   # PURE JS: precheck, generateTimetable, findClashes, scoreQuality
   scheduler.test.js              # runs scheduler on demo data, asserts zero clashes
   data/
-    schema.js                    # emptyCollege(), uid(), data-shape docs
+    schema.js                    # emptyCollege(), uid(), periodTimes(), data-shape docs
     demoCollege.js               # sample college (3 depts, 6 sections, 12 teachers, 8 rooms)
+    gndecCse.js                  # real GNDEC Ludhiana CSE data (Jul-Dec 2026, 12 sections, lab groups A1/A2)
   hooks/useCollegeData.js        # localStorage-backed state (key `ttgen:v1`)
-  components/                    # TimetableGrid, SummaryPanel, shared ui bits
+  hooks/usePrefs.js              # theme (light/dark/system) + text size (key `ttgen:prefs`)
+  theme-dark.css                 # GENERATED: dark theme flips Tailwind colour scales under `.dark`
+  components/                    # TimetableGrid (days across, times down), SummaryPanel, PrefsControls, ui bits
   pages/
     Landing.jsx                  # role selector
     admin/                       # setup wizard: Time → Rooms → Subjects → Teachers → Sections
@@ -41,22 +44,30 @@ src/
 ## Data model (localStorage key `ttgen:v1`)
 ```js
 {
-  time: { days: ["Mon", ...], periodsPerDay: 7, breakAfter: 4 }, // break between P4 and P5
+  meta: null | { name, note },                                   // where the data came from
+  time: { days: ["Mon", ...], periodsPerDay: 7, breakAfter: 4,    // break between P4 and P5
+          startTime: "08:30", periodMinutes: 60, breakMinutes: 60 },
   rooms:    [{ id, name, capacity, type: "classroom" | "lab" | "seminar" }],
   teachers: [{ id, name, department, subjectIds, maxHours, unavailable: ["Mon-1", ...] }],
-  subjects: [{ id, name, code, lectureHours, labHours }],   // labHours = length of ONE lab block
-  sections: [{ id, name, department, students, assignments: [{ subjectId, teacherId }] }],
+  subjects: [{ id, name, code, lectureHours, labHours, labSessions? }], // labHours = length of ONE lab block
+  sections: [{ id, name, department, students, labGroups?, groupNames?,
+               assignments: [{ subjectId, teacherId, labTeacherId? }] }],
   timetable: null | { entries, stats, generatedAt },
 }
 ```
-Timetable entry: `{ sectionId, subjectId, teacherId, roomId, day, period, length, kind: "lecture" | "lab" }`. `day` is a 0-based index, `period` is 0-based internally.
+Timetable entry: `{ sectionId, subjectId, teacherId, roomId, day, period, length, kind: "lecture" | "lab", group?, groupIndex? }`. `day` is a 0-based index, `period` is 0-based internally.
+
+Lab groups: a section with `labGroups: 2` takes each lab as two group units (e.g. A1, A2), each needing a lab
+room for half the students; `labSessions` lab blocks per group per week. Lectures block every group; a lab
+blocks only its own group, so groups can be in different labs at the same time.
 
 ## Scheduler (src/scheduler.js)
 1. `precheck(data)` → `{ ok, problems }` with plain-language problems for impossible input.
 2. Requirements become units: each lecture hour is a 1-period unit; each subject's labs are one unit of `labHours` consecutive periods needing a lab room.
 3. Units ordered most-constrained first (labs, then fewest candidate slots).
-4. Backtracking with busy grids for teacher / room / section; hard constraints: no double-booking, room capacity & type, labs consecutive and not crossing the break, teacher unavailability.
-5. Candidates sorted by soft score (spread a subject across days, avoid > 3 back-to-back periods for a teacher).
+4. Backtracking with busy grids for teacher / room / section lab-group; hard constraints: no double-booking, room capacity & type, labs consecutive and not crossing the break, teacher unavailability.
+5. Candidates sorted by soft score (spread a subject across days, avoid > 3 back-to-back periods for a teacher,
+   run a section's lab groups exactly side by side).
 6. Step limit + random restarts + time budget (`timeLimitMs`, default 4000); on failure returns a plain-language `reason`.
    Identical units (same section/subject/kind) share a `group` and are placed in order to avoid symmetric thrashing.
 7. `findClashes(entries, data)` is an independent verifier used by the UI and the test.
@@ -65,7 +76,10 @@ Timetable entry: `{ sectionId, subjectId, teacherId, roomId, day, period, length
 - `scheduler.js` must stay framework-free (no React imports) and deterministic for a given `seed` option.
 - Reference entities by `id`, never by name. Ids come from `uid()` in `data/schema.js`.
 - Unavailable-slot key format: `"<DayName>-<period>"` with 1-based period, e.g. `"Mon-1"`.
-- Styling with Tailwind utility classes only; `index.css` contains just the Tailwind import.
+- Styling with Tailwind utility classes only. No `dark:` variants needed: dark mode comes from `theme-dark.css`
+  (regenerate it from `node_modules/tailwindcss/theme.css` if you use a new colour hue). Use fixed hex
+  arbitrary values (e.g. `bg-[#4f46e5]`) only for things that must look the same in both themes.
+- Root font size is set by the text-size preference (16/18/20px); size things in rem-based utilities.
 - Keep components small and functional; state flows from `useCollegeData` in `App.jsx` via props.
 - Other localStorage keys (`ttgen:role`, `ttgen:student`, `ttgen:faculty`) are per-viewer conveniences only; wrap all storage access in try/catch.
 - Editing any input through `update()` clears the stored timetable (it would be stale).

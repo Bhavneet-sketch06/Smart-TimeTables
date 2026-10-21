@@ -27,6 +27,14 @@ function mulberry32(seed) {
 
 const byId = (list) => new Map(list.map((x) => [x.id, x]))
 
+// A section can split into lab groups (e.g. A1/A2) that take labs separately, often side by side.
+export const labGroupsOf = (section) => Math.max(1, section.labGroups || 1)
+export const labSessionsOf = (subject) => Math.max(1, subject.labSessions || 1)
+export function groupNamesOf(section) {
+  const n = labGroupsOf(section)
+  return Array.from({ length: n }, (_, g) => section.groupNames?.[g] || `G${g + 1}`)
+}
+
 function roomFits(room, kind, students) {
   if (room.capacity < students) return false
   return kind === 'lab' ? room.type === 'lab' : LECTURE_ROOM_TYPES.has(room.type)
@@ -86,10 +94,14 @@ export function precheck(data) {
   }
 
   const teacherLoad = new Map()
+  const addLoad = (id, n) => teacherLoad.set(id, (teacherLoad.get(id) || 0) + n)
+  const labsByLength = new Map()
   let lectureDemand = 0
   let labDemand = 0
 
   for (const sec of data.sections) {
+    const groups = labGroupsOf(sec)
+    const groupSize = Math.ceil(sec.students / groups)
     let hours = 0
     for (const a of sec.assignments) {
       const sub = ctx.subjects.get(a.subjectId)
@@ -105,20 +117,30 @@ export function precheck(data) {
       if (!(teacher.subjectIds || []).includes(sub.id)) {
         problems.push(`${sec.name}: ${teacher.name} is assigned ${sub.name} but is not listed as teaching it.`)
       }
+      const labTeacher = a.labTeacherId ? ctx.teachers.get(a.labTeacherId) : teacher
+      if (!labTeacher) {
+        problems.push(`${sec.name}: the lab teacher chosen for ${sub.name} no longer exists.`)
+        continue
+      }
       const lec = sub.lectureHours || 0
       const lab = sub.labHours || 0
-      hours += lec + lab
+      const sessions = lab > 0 ? labSessionsOf(sub) : 0
+      // Lab groups can run side by side, so the section itself needs each lab only once.
+      hours += lec + lab * sessions
       lectureDemand += lec
-      labDemand += lab
-      teacherLoad.set(teacher.id, (teacherLoad.get(teacher.id) || 0) + lec + lab)
+      labDemand += lab * sessions * groups
+      addLoad(teacher.id, lec)
+      addLoad(labTeacher.id, lab * sessions * groups)
+      if (lab > 0) labsByLength.set(lab, (labsByLength.get(lab) || 0) + sessions * groups)
 
       if (lab > ctx.longestBlock) {
         problems.push(
           `${sub.name} needs a ${lab}-period lab, but the longest stretch without a break is ${ctx.longestBlock} periods.`,
         )
       }
-      if (lab > 0 && !data.rooms.some((r) => roomFits(r, 'lab', sec.students))) {
-        problems.push(`${sec.name} (${sec.students} students) needs a lab for ${sub.name}, but no lab room is big enough.`)
+      if (lab > 0 && !data.rooms.some((r) => roomFits(r, 'lab', groupSize))) {
+        const who = groups > 1 ? `Each lab group of ${sec.name} (${groupSize} students)` : `${sec.name} (${sec.students} students)`
+        problems.push(`${who} needs a lab for ${sub.name}, but no lab room is big enough.`)
       }
     }
     if (hours > ctx.S) {
@@ -153,13 +175,6 @@ export function precheck(data) {
 
   // Lab blocks can't straddle the break, so count how many whole blocks fit in a week.
   const halves = ctx.hasBreak ? [ctx.breakAfter, P - ctx.breakAfter] : [P]
-  const labsByLength = new Map()
-  for (const sec of data.sections) {
-    for (const a of sec.assignments) {
-      const lab = ctx.subjects.get(a.subjectId)?.labHours || 0
-      if (lab > 0) labsByLength.set(lab, (labsByLength.get(lab) || 0) + 1)
-    }
-  }
   for (const [len, needed] of labsByLength) {
     const perDay = halves.reduce((n, h) => n + Math.floor(h / len), 0)
     const capacity = labRooms * ctx.D * perDay
@@ -178,20 +193,52 @@ export function precheck(data) {
 function buildUnits(data, ctx) {
   const units = []
   for (const sec of data.sections) {
+    const groups = labGroupsOf(sec)
+    const names = groupNamesOf(sec)
+    // Busy-grid keys: a lecture occupies every lab group of the section, a lab only its own group.
+    const allKeys = names.map((_, g) => `${sec.id}#${g}`)
     for (const a of sec.assignments) {
       const sub = ctx.subjects.get(a.subjectId)
       if (!sub || !ctx.teachers.has(a.teacherId)) continue
-      const base = { sectionId: sec.id, subjectId: sub.id, teacherId: a.teacherId, students: sec.students }
-      for (let i = 0; i < (sub.lectureHours || 0); i++) units.push({ ...base, kind: 'lecture', length: 1 })
-      if (sub.labHours > 0) units.push({ ...base, kind: 'lab', length: sub.labHours })
+      const base = { sectionId: sec.id, subjectId: sub.id }
+      for (let i = 0; i < (sub.lectureHours || 0); i++) {
+        units.push({
+          ...base,
+          kind: 'lecture',
+          length: 1,
+          teacherId: a.teacherId,
+          students: sec.students,
+          sectionKeys: allKeys,
+          siblingKeys: [],
+        })
+      }
+      if (!(sub.labHours > 0)) continue
+      const labTeacherId = ctx.teachers.has(a.labTeacherId) ? a.labTeacherId : a.teacherId
+      for (let g = 0; g < groups; g++) {
+        for (let i = 0; i < labSessionsOf(sub); i++) {
+          units.push({
+            ...base,
+            kind: 'lab',
+            length: sub.labHours,
+            teacherId: labTeacherId,
+            students: Math.ceil(sec.students / groups),
+            groupIndex: groups > 1 ? g : undefined,
+            group: groups > 1 ? names[g] : undefined,
+            sectionKeys: [allKeys[g]],
+            siblingKeys: allKeys.filter((_, j) => j !== g),
+          })
+        }
+      }
     }
   }
 
   const roomList = [...ctx.rooms.values()]
   units.forEach((u, idx) => {
     u.idx = idx
-    // Identical units (same section, subject, kind) are interchangeable; search treats them in order.
-    u.group = `${u.sectionId}|${u.subjectId}|${u.kind}`
+    // Identical units (same section, subject, kind, lab group) are interchangeable; search treats them in order.
+    u.symKey = `${u.sectionId}|${u.subjectId}|${u.kind}|${u.groupIndex ?? ''}`
+    // Spread key: lectures of a subject share one; each lab group's sessions share another.
+    u.spreadKey = u.kind === 'lab' ? `${u.sectionKeys[0]}|${u.subjectId}|lab` : `${u.sectionId}|${u.subjectId}`
     const rooms = roomList.filter((r) => roomFits(r, u.kind, u.students))
     const blocked = ctx.unavailable.get(u.teacherId)
     u.candidates = []
@@ -224,25 +271,25 @@ function makeState(ctx) {
 
 function fits(state, u, c) {
   const t = state.row(state.teacher, u.teacherId)
-  const sec = state.row(state.section, u.sectionId)
   const room = state.row(state.room, c.roomId)
   for (let k = 0; k < u.length; k++) {
     const s = c.s + k
-    if (t[s] || sec[s] || room[s]) return false
+    if (t[s] || room[s]) return false
+    for (const key of u.sectionKeys) if (state.row(state.section, key)[s]) return false
   }
   return true
 }
 
 function mark(state, u, c, value) {
   const t = state.row(state.teacher, u.teacherId)
-  const sec = state.row(state.section, u.sectionId)
   const room = state.row(state.room, c.roomId)
+  const secRows = u.sectionKeys.map((key) => state.row(state.section, key))
   for (let k = 0; k < u.length; k++) {
     t[c.s + k] = value
-    sec[c.s + k] = value
     room[c.s + k] = value
+    for (const row of secRows) row[c.s + k] = value
   }
-  const key = `${u.sectionId}|${c.d}|${u.subjectId}`
+  const key = `${u.spreadKey}|${c.d}`
   state.daySubject.set(key, (state.daySubject.get(key) || 0) + (value ? 1 : -1))
 }
 
@@ -259,13 +306,22 @@ function runWith(row, ctx, d, p, len) {
 function softScore(state, ctx, u, c) {
   let score = 0
   // Spread each subject across the week.
-  const same = state.daySubject.get(`${u.sectionId}|${c.d}|${u.subjectId}`) || 0
+  const same = state.daySubject.get(`${u.spreadKey}|${c.d}`) || 0
   score += same * (u.kind === 'lab' ? 4 : 10)
+  // Run a section's lab groups exactly side by side (A1 and A2 in different labs at the same time):
+  // reward full overlap with another group's lab, penalise a staggered partial overlap.
+  for (const key of u.siblingKeys) {
+    const row = state.row(state.section, key)
+    let overlap = 0
+    for (let k = 0; k < u.length; k++) overlap += row[c.s + k]
+    if (overlap === u.length) score -= 12
+    else if (overlap > 0) score += 8
+  }
   // Avoid long back-to-back stretches for teachers (and, more mildly, students).
   const tRow = state.row(state.teacher, u.teacherId)
   const tRun = runWith(tRow, ctx, c.d, c.p, u.length)
   if (tRun > MAX_TEACHER_RUN) score += (tRun - MAX_TEACHER_RUN) * 8
-  const sRun = runWith(state.row(state.section, u.sectionId), ctx, c.d, c.p, u.length)
+  const sRun = runWith(state.row(state.section, u.sectionKeys[0]), ctx, c.d, c.p, u.length)
   if (sRun > 4) score += (sRun - 4) * 3
   // Balance a teacher's day.
   let tDay = 0
@@ -293,8 +349,8 @@ function attempt(units, ctx, rng, maxSteps, deadline, failCount) {
     let pickN = Infinity
     const groups = new Set()
     for (const u of units) {
-      if (placed[u.idx] || groups.has(u.group)) continue
-      groups.add(u.group)
+      if (placed[u.idx] || groups.has(u.symKey)) continue
+      groups.add(u.symKey)
       let n = 0
       for (const c of u.candidates) {
         if (fits(state, u, c) && ++n >= pickN) break
@@ -354,6 +410,7 @@ function toEntries(units, placed) {
       period: c.p,
       length: u.length,
       kind: u.kind,
+      ...(u.group ? { group: u.group, groupIndex: u.groupIndex } : {}),
     })
   })
   return entries.sort((a, b) => a.day - b.day || a.period - b.period)
@@ -361,7 +418,8 @@ function toEntries(units, placed) {
 
 function describeUnit(u, ctx) {
   const sub = ctx.subjects.get(u.subjectId)
-  return `${sub.name}${u.kind === 'lab' ? ' lab' : ''} for ${ctx.sections.get(u.sectionId).name}`
+  const who = ctx.sections.get(u.sectionId).name + (u.group ? ` (group ${u.group})` : '')
+  return `${sub.name}${u.kind === 'lab' ? ' lab' : ''} for ${who}`
 }
 
 // Explain, in plain language, why the hardest unit could not be placed.
@@ -388,11 +446,11 @@ function explainFailure(units, ctx, best, failCount) {
   let sectionBusy = 0
   let roomsBusy = 0
   const tRow = state.row(state.teacher, worst.teacherId)
-  const sRow = state.row(state.section, worst.sectionId)
+  const sRows = worst.sectionKeys.map((key) => state.row(state.section, key))
   for (const [s, cands] of starts) {
     const range = [...Array(worst.length).keys()].map((k) => s + k)
     if (range.some((x) => tRow[x])) teacherBusy++
-    else if (range.some((x) => sRow[x])) sectionBusy++
+    else if (range.some((x) => sRows.some((row) => row[x]))) sectionBusy++
     else if (!cands.some((c) => fits(state, worst, c))) roomsBusy++
   }
   const parts = []
@@ -477,23 +535,28 @@ export function findClashes(entries, data) {
     if (!ctx.blockOk(e.period, e.length)) {
       clashes.push({ type: 'block', message: `${name(ctx.subjects, e.subjectId)} lab at ${where} runs past the break or day end.` })
     }
-    if (room && sec && !roomFits(room, e.kind, sec.students)) {
+    const groups = sec ? labGroupsOf(sec) : 1
+    const students = sec ? (e.groupIndex != null ? Math.ceil(sec.students / groups) : sec.students) : 0
+    if (room && sec && !roomFits(room, e.kind, students)) {
       clashes.push({ type: 'room', message: `${room.name} is not suitable for ${sec.name}'s ${e.kind} at ${where}.` })
     }
+    // A lecture occupies every lab group of the section; a group lab only its own group.
+    const sectionKeys = e.groupIndex != null ? [`${e.sectionId}#${e.groupIndex}`] : [...Array(groups).keys()].map((g) => `${e.sectionId}#${g}`)
     for (let k = 0; k < e.length; k++) {
       const s = e.day * ctx.P + e.period + k
       const at = `${ctx.days[e.day]} P${e.period + k + 1}`
       if (ctx.unavailable.get(e.teacherId)?.has(s)) {
         clashes.push({ type: 'unavailable', message: `${name(ctx.teachers, e.teacherId)} is unavailable at ${at}.` })
       }
-      for (const [kind, id, map] of [
-        ['teacher', e.teacherId, ctx.teachers],
-        ['room', e.roomId, ctx.rooms],
-        ['section', e.sectionId, ctx.sections],
-      ]) {
+      const checks = [
+        ['teacher', e.teacherId, name(ctx.teachers, e.teacherId)],
+        ['room', e.roomId, name(ctx.rooms, e.roomId)],
+        ...sectionKeys.map((key) => ['section', key, name(ctx.sections, e.sectionId)]),
+      ]
+      for (const [kind, id, label] of checks) {
         const key = `${id}|${s}`
         if (seen[kind].has(key)) {
-          clashes.push({ type: kind, message: `${name(map, id)} is double-booked at ${at}.` })
+          clashes.push({ type: kind, message: `${label} is double-booked at ${at}.` })
         } else {
           seen[kind].set(key, e)
         }

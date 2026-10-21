@@ -22,15 +22,24 @@ export default function StepSubjects({ data, update }) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-slate-500">
-        Lab hours are scheduled as one block of consecutive periods in a lab room (e.g. 2 = a double period).
+        A lab is one block of consecutive periods in a lab room (e.g. 2 = a double period). Lab sessions is how many
+        such blocks each lab group gets per week.
       </p>
       {data.subjects.length === 0 && <EmptyState>No subjects yet.</EmptyState>}
       {data.subjects.map((s) => (
-        <div key={s.id} className="grid grid-cols-2 items-end gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+        <div key={s.id} className="grid grid-cols-2 items-end gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]">
           <Field label="Name" value={s.name} onChange={(e) => patch(s.id, { name: e.target.value })} className="col-span-2 sm:col-span-1" />
           <Field label="Code" value={s.code} onChange={(e) => patch(s.id, { code: e.target.value })} />
           <Field label="Lectures / week" type="number" min={0} value={s.lectureHours} onChange={(e) => patch(s.id, { lectureHours: toNumber(e.target.value) })} />
-          <Field label="Lab periods / week" type="number" min={0} value={s.labHours} onChange={(e) => patch(s.id, { labHours: toNumber(e.target.value) })} />
+          <Field label="Lab block (periods)" type="number" min={0} value={s.labHours} onChange={(e) => patch(s.id, { labHours: toNumber(e.target.value) })} />
+          <Field
+            label="Lab sessions / week"
+            type="number"
+            min={1}
+            disabled={!s.labHours}
+            value={s.labHours ? s.labSessions || 1 : ''}
+            onChange={(e) => patch(s.id, { labSessions: toNumber(e.target.value, 1) })}
+          />
           <Button variant="danger" onClick={() => remove(s.id)}>
             Remove
           </Button>

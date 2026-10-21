@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Card, Select } from '../components/ui.jsx'
 import TimetableGrid from '../components/TimetableGrid.jsx'
-import { NoTimetable } from './TimetableViews.jsx'
+import { DataNote, NoTimetable } from './TimetableViews.jsx'
 
 const PICK_KEY = 'ttgen:faculty'
 
@@ -34,6 +34,7 @@ export default function FacultyView({ data }) {
 
   return (
     <div className="space-y-4">
+      <DataNote data={data} />
       <Card className="flex flex-wrap items-end gap-4">
         <Select
           label="Your name"

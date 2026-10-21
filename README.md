@@ -7,7 +7,15 @@ Generate clash-free weekly timetables for any college, entirely in the browser. 
 npm install
 npm run dev
 ```
-Open http://localhost:5173 → **Administrator** → **Load demo college** → go to **Sections** → **Generate timetable**.
+Open http://localhost:5173 → **Administrator** → **Load GNDEC CSE (real data)** or **Load demo college** → go to **Sections** → **Generate timetable**.
+
+Use the ☀️ / 🌙 / 💻 switch for light, dark or system theme, and the **A A A** switch for text size.
+
+## GNDEC Ludhiana data
+`src/data/gndecCse.js` models the CSE department's B.Tech 3rd and 5th semesters (sections A–F each, 354 classes a week)
+from public documents on cse.gndec.ac.in: the July–Dec 2026 subject allotment, the published timetable's structure
+(08:30–17:30, lunch 12:30–13:30, labs in half-groups A1/A2) and the room/lab infrastructure lists. It generates in
+well under a second with zero clashes. It is a realistic sample, **not** the official GNDEC timetable.
 
 ## Roles
 - **Administrator**: 5-step setup wizard (time structure → rooms → subjects → teachers → sections), then generate and review.

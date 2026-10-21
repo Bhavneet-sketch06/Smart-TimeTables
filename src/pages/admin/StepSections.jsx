@@ -7,7 +7,7 @@ export default function StepSections({ data, update }) {
   const add = () =>
     update('sections', (sections) => [
       ...sections,
-      { id: uid('sec'), name: `Section ${sections.length + 1}`, department: '', students: 60, assignments: [] },
+      { id: uid('sec'), name: `Section ${sections.length + 1}`, department: '', students: 60, labGroups: 1, assignments: [] },
     ])
   const patch = (id, changes) => update('sections', (sections) => patchItem(sections, id, changes))
 
@@ -25,15 +25,24 @@ export default function StepSections({ data, update }) {
       {data.sections.map((sec) => {
         const hours = sec.assignments.reduce((n, a) => {
           const s = subjectById.get(a.subjectId)
-          return n + (s ? s.lectureHours + s.labHours : 0)
+          return n + (s ? s.lectureHours + s.labHours * (s.labHours ? s.labSessions || 1 : 0) : 0)
         }, 0)
         const unused = data.subjects.filter((s) => !sec.assignments.some((a) => a.subjectId === s.id))
         return (
           <div key={sec.id} className="space-y-3 rounded-lg border border-slate-200 p-3">
-            <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[2fr_1fr_1fr_auto]">
+            <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
               <Field label="Name" value={sec.name} onChange={(e) => patch(sec.id, { name: e.target.value })} className="col-span-2 sm:col-span-1" />
               <Field label="Department" value={sec.department} onChange={(e) => patch(sec.id, { department: e.target.value })} />
               <Field label="Students" type="number" min={1} value={sec.students} onChange={(e) => patch(sec.id, { students: toNumber(e.target.value, 1) })} />
+              <Field
+                label="Lab groups"
+                title="Split the section into this many groups for labs (e.g. 2 = A1/A2)"
+                type="number"
+                min={1}
+                max={4}
+                value={sec.labGroups || 1}
+                onChange={(e) => patch(sec.id, { labGroups: Math.min(4, toNumber(e.target.value, 1)), groupNames: undefined })}
+              />
               <Button variant="danger" onClick={() => update('sections', (sections) => removeItem(sections, sec.id))}>
                 Remove
               </Button>
@@ -50,7 +59,8 @@ export default function StepSections({ data, update }) {
                     <span className="min-w-40 flex-1 text-sm">
                       {sub?.name ?? 'Unknown subject'}{' '}
                       <span className="text-xs text-slate-400">
-                        {sub?.lectureHours}L{sub?.labHours ? ` + ${sub.labHours} lab` : ''}
+                        {sub?.lectureHours}L
+                        {sub?.labHours ? ` + ${sub.labSessions > 1 ? `${sub.labSessions}×` : ''}${sub.labHours}P lab` : ''}
                       </span>
                     </span>
                     <Select
@@ -63,6 +73,21 @@ export default function StepSections({ data, update }) {
                       }
                       className="min-w-48"
                     />
+                    {sub?.labHours > 0 && (
+                      <Select
+                        value={a.labTeacherId || ''}
+                        options={[{ value: '', label: 'Lab: same teacher' }].concat(
+                          qualified.map((t) => ({ value: t.id, label: `Lab: ${t.name}` })),
+                        )}
+                        onChange={(e) =>
+                          setAssignments(
+                            sec,
+                            sec.assignments.map((x, j) => (j === i ? { ...x, labTeacherId: e.target.value || undefined } : x)),
+                          )
+                        }
+                        className="min-w-48"
+                      />
+                    )}
                     <Button variant="ghost" onClick={() => setAssignments(sec, sec.assignments.filter((_, j) => j !== i))}>
                       ✕
                     </Button>

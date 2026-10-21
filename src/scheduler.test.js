@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'vitest'
 import { demoCollege } from './data/demoCollege.js'
+import { gndecCse } from './data/gndecCse.js'
 import { precheck, generateTimetable, findClashes, scoreQuality } from './scheduler.js'
 
 describe('scheduler on demo college', () => {
@@ -39,6 +40,49 @@ describe('scheduler on demo college', () => {
     const data = demoCollege()
     const { entries } = generateTimetable(data, { seed: 7 })
     expect(scoreQuality(entries, data).score).toBeGreaterThanOrEqual(70)
+  })
+})
+
+describe('scheduler on GNDEC CSE data (lab groups, lab sessions, lab teachers)', () => {
+  test.each([1, 9])('generates a complete, clash-free timetable (seed %i)', (seed) => {
+    const data = gndecCse()
+    expect(precheck(data).problems).toEqual([])
+    const result = generateTimetable(data, { seed, timeLimitMs: 15000 })
+
+    expect(result.reason).toBe('')
+    expect(result.ok).toBe(true)
+    expect(findClashes(result.entries, data)).toEqual([])
+
+    for (const sec of data.sections) {
+      const mine = result.entries.filter((e) => e.sectionId === sec.id)
+      for (const a of sec.assignments) {
+        const sub = data.subjects.find((s) => s.id === a.subjectId)
+        const lectures = mine.filter((e) => e.subjectId === sub.id && e.kind === 'lecture')
+        expect(lectures).toHaveLength(sub.lectureHours)
+        lectures.forEach((e) => expect(e.teacherId).toBe(a.teacherId))
+        // Every lab group gets every lab session, taught by the lab teacher, in a lab big enough for the group.
+        for (const group of sec.groupNames) {
+          const labs = mine.filter((e) => e.subjectId === sub.id && e.kind === 'lab' && e.group === group)
+          expect(labs).toHaveLength(sub.labHours ? sub.labSessions : 0)
+          for (const e of labs) {
+            expect(e.teacherId).toBe(a.labTeacherId ?? a.teacherId)
+            expect(data.rooms.find((r) => r.id === e.roomId).capacity).toBeGreaterThanOrEqual(sec.students / 2)
+          }
+        }
+      }
+    }
+  })
+
+  test('two lab groups of one section may share a time slot but not a room', () => {
+    const data = gndecCse()
+    const base = { sectionId: 'd2-a', subjectId: 'oop', teacherId: 'vivek', day: 0, period: 0, length: 2, kind: 'lab' }
+    const parallel = [
+      { ...base, roomId: 'sl1', group: 'A1', groupIndex: 0 },
+      { ...base, subjectId: 'ds', teacherId: 'diksha', roomId: 'sl2', group: 'A2', groupIndex: 1 },
+    ]
+    expect(findClashes(parallel, data)).toEqual([])
+    const lectureDuringLab = [...parallel, { sectionId: 'd2-a', subjectId: 'am', teacherId: 'pragya', roomId: 'g12', day: 0, period: 1, length: 1, kind: 'lecture' }]
+    expect(findClashes(lectureDuringLab, data).map((c) => c.type)).toEqual(['section', 'section'])
   })
 })
 

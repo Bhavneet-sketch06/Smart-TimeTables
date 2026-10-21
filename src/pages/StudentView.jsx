@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Card, Select } from '../components/ui.jsx'
 import TimetableGrid from '../components/TimetableGrid.jsx'
-import { NoTimetable } from './TimetableViews.jsx'
+import { DataNote, NoTimetable } from './TimetableViews.jsx'
+import { groupNamesOf, labGroupsOf } from '../scheduler.js'
 
 const PICK_KEY = 'ttgen:student'
 
@@ -30,23 +31,44 @@ export default function StudentView({ data }) {
   const dept = departments.includes(pick.dept) ? pick.dept : departments[0]
   const sections = data.sections.filter((s) => s.department === dept)
   const section = sections.find((s) => s.id === pick.section) ?? sections[0]
-  const entries = data.timetable.entries.filter((e) => e.sectionId === section?.id)
+  const groupNames = section && labGroupsOf(section) > 1 ? groupNamesOf(section) : []
+  const group = groupNames.includes(pick.group) ? pick.group : ''
+  // A chosen lab group sees its own labs plus all whole-section classes.
+  const entries = data.timetable.entries.filter(
+    (e) => e.sectionId === section?.id && (!group || !e.group || e.group === group),
+  )
 
   return (
     <div className="space-y-4">
-      <Card className="grid grid-cols-2 gap-3">
-        <Select label="Department" value={dept} options={departments} onChange={(e) => save({ dept: e.target.value })} />
+      <DataNote data={data} />
+      <Card className={`grid gap-3 ${groupNames.length ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
+        <Select
+          label="Department"
+          value={dept}
+          options={departments}
+          onChange={(e) => save({ dept: e.target.value })}
+          className="col-span-2 sm:col-span-1"
+        />
         <Select
           label="Section"
           value={section?.id ?? ''}
           options={sections.map((s) => ({ value: s.id, label: s.name }))}
           onChange={(e) => save({ dept, section: e.target.value })}
         />
+        {groupNames.length > 0 && (
+          <Select
+            label="Lab group"
+            value={group}
+            options={[{ value: '', label: 'All groups' }].concat(groupNames)}
+            onChange={(e) => save({ dept, section: section.id, group: e.target.value })}
+          />
+        )}
       </Card>
       {section && (
         <>
           <h1 className="text-xl font-bold">
-            {section.name} <span className="text-sm font-normal text-slate-500">weekly timetable</span>
+            {section.name}
+            {group && ` · ${group}`} <span className="text-base font-normal text-slate-500">weekly timetable</span>
           </h1>
           <TimetableGrid data={data} entries={entries} mode="section" />
         </>

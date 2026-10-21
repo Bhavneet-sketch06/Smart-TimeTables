@@ -16,7 +16,7 @@ const STEPS = [
 ]
 
 export default function AdminWizard({ college, onGenerated }) {
-  const { data, update, loadDemo, reset, setTimetable } = college
+  const { data, update, loadDemo, loadGndec, reset, setTimetable } = college
   const [step, setStep] = useState(0)
   const [busy, setBusy] = useState(false)
   const [problems, setProblems] = useState([])
@@ -40,8 +40,14 @@ export default function AdminWizard({ college, onGenerated }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold">College setup</h1>
-        <div className="flex gap-2">
+        <div>
+          <h1 className="text-2xl font-bold">College setup</h1>
+          {data.meta && <p className="text-slate-500">Loaded: {data.meta.name}</p>}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => { loadGndec(); setProblems([]) }}>
+            Load GNDEC CSE (real data)
+          </Button>
           <Button variant="secondary" onClick={() => { loadDemo(); setProblems([]) }}>
             Load demo college
           </Button>
