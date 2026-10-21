@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useCollegeData } from './hooks/useCollegeData.js'
 import Landing from './pages/Landing.jsx'
-import { Button, Card } from './components/ui.jsx'
+import { Button } from './components/ui.jsx'
 import AdminWizard from './pages/admin/AdminWizard.jsx'
+import TimetableViews from './pages/TimetableViews.jsx'
 
 const ROLE_KEY = 'ttgen:role'
 const ROLE_LABELS = { admin: 'Administrator', hod: 'HOD / Coordinator', faculty: 'Faculty', student: 'Student' }
@@ -48,9 +49,9 @@ export default function App() {
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6">
-        {view === 'admin' ? (
-          <AdminPage college={college} />
-        ) : (
+        {view === 'admin' && <AdminPage college={college} />}
+        {view === 'hod' && <TimetableViews data={college.data} withDepartmentFilter />}
+        {(view === 'faculty' || view === 'student') && (
           <p className="text-slate-500">{ROLE_LABELS[view]} view coming soon.</p>
         )}
       </main>
@@ -59,20 +60,30 @@ export default function App() {
 }
 
 function AdminPage({ college }) {
-  const tt = college.data.timetable
+  const [tab, setTab] = useState(college.data.timetable ? 'timetable' : 'setup')
   return (
     <div className="space-y-4">
-      {tt && (
-        <Card className={tt.ok ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}>
-          <p className="font-semibold">{tt.ok ? 'Timetable generated' : 'Timetable incomplete'}</p>
-          <p className="text-sm">
-            Placed {tt.stats.placed}/{tt.stats.total} classes · {tt.stats.clashes} clashes · quality {tt.stats.quality}/100 ·{' '}
-            {tt.stats.ms} ms
-          </p>
-          {tt.reason && <p className="mt-1 text-sm text-amber-800">{tt.reason}</p>}
-        </Card>
+      <div className="flex gap-2 border-b border-slate-200">
+        {[
+          ['setup', 'Setup'],
+          ['timetable', 'Timetable'],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
+              tab === id ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === 'setup' ? (
+        <AdminWizard college={college} onGenerated={() => setTab('timetable')} />
+      ) : (
+        <TimetableViews data={college.data} />
       )}
-      <AdminWizard college={college} onGenerated={() => {}} />
     </div>
   )
 }
