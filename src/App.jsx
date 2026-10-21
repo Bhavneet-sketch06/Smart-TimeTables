@@ -4,6 +4,8 @@ import Landing from './pages/Landing.jsx'
 import { Button } from './components/ui.jsx'
 import AdminWizard from './pages/admin/AdminWizard.jsx'
 import TimetableViews from './pages/TimetableViews.jsx'
+import FacultyView from './pages/FacultyView.jsx'
+import StudentView from './pages/StudentView.jsx'
 
 const ROLE_KEY = 'ttgen:role'
 const ROLE_LABELS = { admin: 'Administrator', hod: 'HOD / Coordinator', faculty: 'Faculty', student: 'Student' }
@@ -51,9 +53,8 @@ export default function App() {
       <main className="mx-auto max-w-6xl px-4 py-6">
         {view === 'admin' && <AdminPage college={college} />}
         {view === 'hod' && <TimetableViews data={college.data} withDepartmentFilter />}
-        {(view === 'faculty' || view === 'student') && (
-          <p className="text-slate-500">{ROLE_LABELS[view]} view coming soon.</p>
-        )}
+        {view === 'faculty' && <FacultyView data={college.data} />}
+        {view === 'student' && <StudentView data={college.data} />}
       </main>
     </div>
   )
