@@ -1,10 +1,11 @@
-import { ALL_DAYS } from '../../data/schema.js'
+import { ALL_DAYS, DEFAULT_TIME, periodTimes } from '../../data/schema.js'
 import { Field } from '../../components/ui.jsx'
 import { toNumber } from './listUtils.js'
 
 export default function StepTime({ data, update }) {
-  const { time } = data
+  const time = { ...DEFAULT_TIME, ...data.time }
   const set = (changes) => update('time', { ...time, ...changes })
+  const { periods, breakSlot } = periodTimes(time)
 
   const toggleDay = (day) => {
     const days = time.days.includes(day) ? time.days.filter((d) => d !== day) : [...time.days, day]
@@ -14,13 +15,13 @@ export default function StepTime({ data, update }) {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="mb-2 text-sm font-medium text-slate-600">Working days</h3>
+        <h3 className="mb-2 font-medium text-slate-600">Working days</h3>
         <div className="flex flex-wrap gap-2">
           {ALL_DAYS.map((day) => (
             <button
               key={day}
               onClick={() => toggleDay(day)}
-              className={`rounded-lg border px-4 py-2 text-sm font-medium ${
+              className={`rounded-lg border px-4 py-2 font-medium ${
                 time.days.includes(day)
                   ? 'border-indigo-600 bg-indigo-600 text-white'
                   : 'border-slate-300 bg-white text-slate-600'
@@ -31,7 +32,16 @@ export default function StepTime({ data, update }) {
           ))}
         </div>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field label="Day starts at" type="time" value={time.startTime} onChange={(e) => set({ startTime: e.target.value })} />
+        <Field
+          label="Period length (minutes)"
+          type="number"
+          min={10}
+          max={180}
+          value={time.periodMinutes}
+          onChange={(e) => set({ periodMinutes: Math.min(180, toNumber(e.target.value, 10)) })}
+        />
         <Field
           label="Periods per day"
           type="number"
@@ -51,20 +61,32 @@ export default function StepTime({ data, update }) {
           value={time.breakAfter}
           onChange={(e) => set({ breakAfter: Math.min(time.periodsPerDay - 1, toNumber(e.target.value)) })}
         />
+        <Field
+          label="Break length (minutes)"
+          type="number"
+          min={0}
+          max={180}
+          value={time.breakMinutes}
+          onChange={(e) => set({ breakMinutes: Math.min(180, toNumber(e.target.value)) })}
+        />
       </div>
       <div>
-        <h3 className="mb-2 text-sm font-medium text-slate-600">Preview of one day</h3>
-        <div className="flex flex-wrap gap-1">
-          {Array.from({ length: time.periodsPerDay }, (_, p) => (
+        <h3 className="mb-2 font-medium text-slate-600">One day at a glance</h3>
+        <div className="flex flex-wrap gap-2">
+          {periods.map((slot, p) => (
             <span key={p} className="contents">
-              <span className="rounded bg-slate-100 px-2 py-1 text-xs">P{p + 1}</span>
-              {time.breakAfter === p + 1 && p + 1 < time.periodsPerDay && (
-                <span className="rounded bg-amber-100 px-2 py-1 text-xs text-amber-800">Break</span>
+              {breakSlot && p === time.breakAfter && (
+                <span className="rounded-lg bg-amber-100 px-3 py-1.5 text-sm text-amber-800">
+                  Break · {breakSlot.label}
+                </span>
               )}
+              <span className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm">
+                <b>P{p + 1}</b> · {slot.label}
+              </span>
             </span>
           ))}
         </div>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-3 text-slate-500">
           {time.days.length} days × {time.periodsPerDay} periods = {time.days.length * time.periodsPerDay} periods per
           week. Labs never run across the break.
         </p>

@@ -68,7 +68,14 @@ const sections = [
 export function demoCollege() {
   // Deep copy so edits in the UI never mutate these module constants.
   return structuredClone({
-    time: { days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], periodsPerDay: 7, breakAfter: 4 },
+    time: {
+      days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+      periodsPerDay: 7,
+      breakAfter: 4,
+      startTime: '09:00',
+      periodMinutes: 55,
+      breakMinutes: 40,
+    },
     rooms,
     teachers,
     subjects,
