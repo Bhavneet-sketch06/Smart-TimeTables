@@ -43,13 +43,13 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur print:hidden">
         <div className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6 lg:px-8">
           <button onClick={() => setView('landing')} className="flex items-center gap-2">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-600 text-white">
               <CalendarDays className="h-5 w-5" />
             </span>
-            <span className="text-lg font-bold">Timetable</span>
+            <span className="text-lg font-bold">Smart TimeTables</span>
             <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-sm font-medium text-indigo-700">
               {ROLE_LABELS[view]}
             </span>
@@ -62,7 +62,7 @@ export default function App() {
           </div>
         </div>
       </header>
-      <main className="w-full px-4 py-6 sm:px-6 lg:px-8">
+      <main className="w-full px-4 py-6 sm:px-6 lg:px-8 print:p-0">
         {view === 'admin' && <AdminPage college={college} />}
         {view === 'hod' && <TimetableViews data={college.data} withDepartmentFilter />}
         {view === 'faculty' && <FacultyView data={college.data} />}
@@ -77,7 +77,7 @@ function AdminPage({ college }) {
   const [tab, setTab] = useState(college.data.timetable ? 'timetable' : 'setup')
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 border-b border-slate-200">
+      <div className="flex gap-2 border-b border-slate-200 print:hidden">
         {[
           ['setup', 'Setup'],
           ['timetable', 'Timetable'],

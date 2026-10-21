@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { departmentsOf } from '../data/schema.js'
 import { Card, EmptyState, Select } from '../components/ui.jsx'
-import TimetableGrid from '../components/TimetableGrid.jsx'
+import TimetableSheet from '../components/TimetableSheet.jsx'
 import SummaryPanel from '../components/SummaryPanel.jsx'
 
 const TABS = [
@@ -14,7 +14,7 @@ const TABS = [
 export function DataNote({ data }) {
   if (!data.meta) return null
   return (
-    <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-indigo-900">
+    <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-indigo-900 print:hidden">
       <span className="font-semibold">{data.meta.name}</span>
       {data.meta.note && <span className="text-indigo-700"> · {data.meta.note}</span>}
     </div>
@@ -40,12 +40,21 @@ export default function TimetableViews({ data, withDepartmentFilter = false }) {
   // Count distinct busy slots so lab groups running side by side aren't counted twice.
   const busy = new Set(entries.flatMap((e) => Array.from({ length: e.length }, (_, k) => `${e.day}|${e.period + k}`)))
   const periods = busy.size
+  const item = options.find((o) => o.id === id)
+  const subtitle =
+    tab === 'section'
+      ? [item?.department, `${item?.students} students`].filter(Boolean).join(' · ')
+      : tab === 'teacher'
+        ? `${item?.department || 'Faculty'} · weekly teaching schedule`
+        : `${item?.type ?? ''} · ${item?.capacity ?? '?'} seats · room occupancy`
 
   return (
     <div className="space-y-4">
       <DataNote data={data} />
-      <SummaryPanel data={data} />
-      <Card className="space-y-4">
+      <div className="print:hidden">
+        <SummaryPanel data={data} />
+      </div>
+      <Card className="space-y-4 print:hidden">
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex rounded-lg bg-slate-100 p-1">
             {TABS.map((t) => (
@@ -75,10 +84,20 @@ export default function TimetableViews({ data, withDepartmentFilter = false }) {
             onChange={(e) => setSelected({ ...selected, [tab]: e.target.value })}
             className="min-w-48"
           />
-          <span className="pb-2 text-sm text-slate-500">{periods} periods / week</span>
         </div>
-        {id ? <TimetableGrid data={data} entries={entries} mode={tab} /> : <EmptyState>Nothing to show.</EmptyState>}
       </Card>
+      {id ? (
+        <TimetableSheet
+          data={data}
+          entries={entries}
+          mode={tab}
+          title={item?.name}
+          subtitle={subtitle}
+          stats={`${periods} periods / week`}
+        />
+      ) : (
+        <EmptyState>Nothing to show.</EmptyState>
+      )}
     </div>
   )
 }

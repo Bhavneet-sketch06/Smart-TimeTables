@@ -38,7 +38,8 @@ src/
   hooks/useCollegeData.js        # localStorage-backed state (key `ttgen:v1`)
   hooks/usePrefs.js              # theme (light/dark/system) + text size (key `ttgen:prefs`)
   theme-dark.css                 # GENERATED: dark theme flips Tailwind colour scales under `.dark`
-  components/                    # TimetableGrid (days across, times down), SummaryPanel, PrefsControls, ChatWidget, ui bits
+  components/                    # TimetableGrid (days across, times down, legend), TimetableSheet (title + Print),
+                                 # SummaryPanel, PrefsControls, ChatWidget, ui bits
   pages/
     Landing.jsx                  # role selector
     admin/                       # setup wizard: Time → Rooms → Subjects → Teachers → Sections
@@ -86,6 +87,8 @@ blocks only its own group, so groups can be in different labs at the same time.
   (regenerate it from `node_modules/tailwindcss/theme.css` if you use a new colour hue). Use fixed hex
   arbitrary values (e.g. `bg-[#4f46e5]`) only for things that must look the same in both themes.
 - Root font size is set by the text-size preference (16/18/20px); size things in rem-based utilities.
+- Printing: render timetables through `TimetableSheet` and mark everything else `print:hidden`; index.css sets
+  A4 landscape and a smaller root font for print, and usePrefs switches to the light theme while printing.
 - Keep components small and functional; state flows from `useCollegeData` in `App.jsx` via props.
 - Other localStorage keys (`ttgen:role`, `ttgen:student`, `ttgen:faculty`) are per-viewer conveniences only; wrap all storage access in try/catch.
 - Editing any input through `update()` clears the stored timetable (it would be stale).

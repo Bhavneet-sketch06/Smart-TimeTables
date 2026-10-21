@@ -116,7 +116,7 @@ export default function Landing({ onSelect, hasData, controls }) {
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-600 text-white">
               <CalendarDays className="h-5 w-5" />
             </span>
-            <span className="text-lg font-bold tracking-tight">Timetable</span>
+            <span className="text-lg font-bold tracking-tight">Smart TimeTables</span>
           </a>
           <nav className="hidden items-center gap-7 text-slate-600 md:flex">
             <a href="#features" className="hover:text-slate-900">Features</a>
@@ -137,16 +137,23 @@ export default function Landing({ onSelect, hasData, controls }) {
 
       <main id="top">
         <section className="relative overflow-hidden">
+          {/* Soft glow plus a faint dot grid behind the hero. */}
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,var(--color-indigo-100),transparent_60%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(var(--color-slate-200)_1px,transparent_1px)] [background-size:22px_22px] [mask-image:linear-gradient(to_bottom,black,transparent_85%)]" />
+          <div className="pointer-events-none absolute -left-32 top-40 h-72 w-72 rounded-full bg-violet-200/40 blur-3xl" />
           <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:px-8 lg:py-24">
             <div>
               <span className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700">
                 <Sparkles className="h-4 w-4" /> Now with an AI timetable assistant
               </span>
-              <h1 className="mt-5 text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-                Clash-free college timetables in seconds.
+              <h1 className="mt-5 text-5xl font-extrabold tracking-tight text-slate-900 sm:text-6xl lg:text-7xl">
+                Smart{' '}
+                <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-500 bg-clip-text text-transparent">
+                  TimeTables
+                </span>
               </h1>
-              <p className="mt-5 max-w-xl text-lg text-slate-600">
+              <p className="mt-4 text-2xl font-semibold text-slate-700">Clash-free college schedules, generated in seconds.</p>
+              <p className="mt-3 max-w-xl text-lg text-slate-600">
                 Plan lectures, labs and lab groups across every section, faculty member and room. Built for real colleges,
                 running entirely in your browser.
               </p>
@@ -183,7 +190,16 @@ export default function Landing({ onSelect, hasData, controls }) {
               </dl>
               <p className="mt-2 text-xs text-slate-400">Measured on GNDEC Ludhiana CSE data (12 sections).</p>
             </div>
-            <ProductPreview />
+            <div className="relative">
+              <ProductPreview />
+              {/* Floating assistant bubble to hint at the AI feature. */}
+              <div className="absolute -bottom-6 -left-4 hidden max-w-64 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl sm:block">
+                <div className="flex items-center gap-2 text-sm font-semibold text-indigo-700">
+                  <Sparkles className="h-4 w-4" /> Timetable Assistant
+                </div>
+                <p className="mt-1 text-sm text-slate-600">D3 CS A is free on Wednesday from 13:30 to 15:30.</p>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -273,7 +289,7 @@ export default function Landing({ onSelect, hasData, controls }) {
 
       <footer className="border-t border-slate-200">
         <div className="mx-auto flex max-w-7xl flex-col justify-between gap-2 px-4 py-6 text-sm text-slate-500 sm:flex-row sm:px-6 lg:px-8">
-          <span>Timetable · College timetable generator</span>
+          <span>Smart TimeTables · College timetable generator</span>
           <span>Your data stays in this browser.</span>
         </div>
       </footer>

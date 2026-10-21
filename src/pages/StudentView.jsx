@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Card, Select } from '../components/ui.jsx'
-import TimetableGrid from '../components/TimetableGrid.jsx'
+import TimetableSheet from '../components/TimetableSheet.jsx'
 import { DataNote, NoTimetable } from './TimetableViews.jsx'
 import { groupNamesOf, labGroupsOf } from '../scheduler.js'
 
@@ -41,7 +41,7 @@ export default function StudentView({ data }) {
   return (
     <div className="space-y-4">
       <DataNote data={data} />
-      <Card className={`grid gap-3 ${groupNames.length ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
+      <Card className={`grid gap-3 print:hidden ${groupNames.length ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
         <Select
           label="Department"
           value={dept}
@@ -65,13 +65,13 @@ export default function StudentView({ data }) {
         )}
       </Card>
       {section && (
-        <>
-          <h1 className="text-xl font-bold">
-            {section.name}
-            {group && ` · ${group}`} <span className="text-base font-normal text-slate-500">weekly timetable</span>
-          </h1>
-          <TimetableGrid data={data} entries={entries} mode="section" />
-        </>
+        <TimetableSheet
+          data={data}
+          entries={entries}
+          mode="section"
+          title={`${section.name}${group ? ` · Group ${group}` : ''}`}
+          subtitle={`${section.department} · weekly timetable`}
+        />
       )}
     </div>
   )

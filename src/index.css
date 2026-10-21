@@ -8,3 +8,21 @@
 html {
   font-size: 18px;
 }
+
+/* Printing: one timetable per A4 landscape page, colours kept, light theme (usePrefs drops .dark). */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+  html {
+    font-size: 9.5px !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

@@ -30,8 +30,16 @@ export function usePrefs() {
     } catch {
       // preferences are a convenience only
     }
+    // Always print in the light theme; restore the chosen theme afterwards.
+    const beforePrint = () => root.classList.remove('dark')
     media.addEventListener('change', apply)
-    return () => media.removeEventListener('change', apply)
+    window.addEventListener('beforeprint', beforePrint)
+    window.addEventListener('afterprint', apply)
+    return () => {
+      media.removeEventListener('change', apply)
+      window.removeEventListener('beforeprint', beforePrint)
+      window.removeEventListener('afterprint', apply)
+    }
   }, [prefs])
 
   return [prefs, (changes) => setPrefs((p) => ({ ...p, ...changes }))]

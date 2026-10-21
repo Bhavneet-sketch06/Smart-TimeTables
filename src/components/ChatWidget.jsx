@@ -75,7 +75,7 @@ export default function ChatWidget({ data }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-3 font-semibold text-white shadow-lg shadow-indigo-600/30 transition hover:bg-indigo-700"
+        className="fixed bottom-5 right-5 z-40 flex print:hidden items-center gap-2 rounded-full bg-indigo-600 px-5 py-3 font-semibold text-white shadow-lg shadow-indigo-600/30 transition hover:bg-indigo-700"
       >
         <MessageCircle className="h-5 w-5" /> Ask AI
       </button>
@@ -85,7 +85,7 @@ export default function ChatWidget({ data }) {
   return (
     <section
       aria-label="Timetable assistant"
-      className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-white shadow-2xl sm:inset-auto sm:bottom-5 sm:right-5 sm:h-[min(640px,calc(100vh-2.5rem))] sm:w-[420px] sm:rounded-2xl sm:border sm:border-slate-200"
+      className="fixed inset-0 z-40 flex flex-col print:hidden overflow-hidden bg-white shadow-2xl sm:inset-auto sm:bottom-5 sm:right-5 sm:h-[min(640px,calc(100vh-2.5rem))] sm:w-[420px] sm:rounded-2xl sm:border sm:border-slate-200"
     >
       <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
         <div className="flex items-center gap-2.5">

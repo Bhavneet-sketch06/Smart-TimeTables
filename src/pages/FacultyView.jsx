@@ -1,60 +1,75 @@
 import { useState } from 'react'
 import { Card, Select } from '../components/ui.jsx'
-import TimetableGrid from '../components/TimetableGrid.jsx'
+import TimetableSheet from '../components/TimetableSheet.jsx'
 import { DataNote, NoTimetable } from './TimetableViews.jsx'
 
 const PICK_KEY = 'ttgen:faculty'
 
 function readPick() {
   try {
-    return localStorage.getItem(PICK_KEY) || ''
+    const raw = localStorage.getItem(PICK_KEY)
+    // Older versions stored just the teacher id.
+    return raw?.startsWith('{') ? JSON.parse(raw) : { teacherId: raw || '' }
   } catch {
-    return ''
+    return {}
   }
 }
 
+const periodsOf = (entries) => entries.reduce((n, e) => n + e.length, 0)
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
+
 export default function FacultyView({ data }) {
-  const [teacherId, setTeacherId] = useState(readPick)
+  const [pick, setPick] = useState(readPick)
   if (!data.timetable) return <NoTimetable />
 
-  const teachers = [...data.teachers].sort((a, b) => a.name.localeCompare(b.name))
-  const teacher = teachers.find((t) => t.id === teacherId) ?? teachers[0]
-  const entries = data.timetable.entries.filter((e) => e.teacherId === teacher?.id)
-  const periods = entries.reduce((n, e) => n + e.length, 0)
-  const sections = new Set(entries.map((e) => e.sectionId)).size
-
-  const choose = (id) => {
-    setTeacherId(id)
+  const save = (next) => {
+    setPick(next)
     try {
-      localStorage.setItem(PICK_KEY, id)
+      localStorage.setItem(PICK_KEY, JSON.stringify(next))
     } catch {
       // remembering the choice is optional
     }
   }
 
+  const sectionsById = new Map(data.sections.map((s) => [s.id, s]))
+  const teachers = [...data.teachers].sort((a, b) => a.name.localeCompare(b.name))
+  const teacher = teachers.find((t) => t.id === pick.teacherId) ?? teachers[0]
+  const allEntries = data.timetable.entries.filter((e) => e.teacherId === teacher?.id)
+
+  // Years / classes this teacher teaches, taken from the sections' department (e.g. "CSE - 3rd Sem (D2)").
+  const years = [...new Set(allEntries.map((e) => sectionsById.get(e.sectionId)?.department).filter(Boolean))].sort()
+  const year = years.includes(pick.year) ? pick.year : ''
+  const entries = year ? allEntries.filter((e) => sectionsById.get(e.sectionId)?.department === year) : allEntries
+  const sectionCount = new Set(entries.map((e) => e.sectionId)).size
+
   return (
     <div className="space-y-4">
       <DataNote data={data} />
-      <Card className="flex flex-wrap items-end gap-4">
+      <Card className="grid gap-4 sm:grid-cols-[2fr_1fr] print:hidden">
         <Select
           label="Your name"
           value={teacher?.id ?? ''}
           options={teachers.map((t) => ({ value: t.id, label: `${t.name} (${t.department})` }))}
-          onChange={(e) => choose(e.target.value)}
-          className="min-w-64 flex-1"
+          onChange={(e) => save({ teacherId: e.target.value })}
         />
-        {teacher && (
-          <div className="flex gap-4 pb-1 text-sm text-slate-600">
-            <span>
-              <b className="text-slate-900">{periods}</b> / {teacher.maxHours} periods
-            </span>
-            <span>
-              <b className="text-slate-900">{sections}</b> sections
-            </span>
-          </div>
-        )}
+        <Select
+          label="Year / class"
+          value={year}
+          options={[{ value: '', label: `All years (${years.length})` }].concat(years)}
+          onChange={(e) => save({ teacherId: teacher?.id, year: e.target.value })}
+          disabled={years.length < 2}
+        />
       </Card>
-      {teacher && <TimetableGrid data={data} entries={entries} mode="teacher" />}
+      {teacher && (
+        <TimetableSheet
+          data={data}
+          entries={entries}
+          mode="teacher"
+          title={teacher.name}
+          subtitle={`${year || 'All years'} · weekly teaching schedule`}
+          stats={`${plural(periodsOf(entries), 'period')} · ${plural(sectionCount, 'section')} · total load ${periodsOf(allEntries)} / ${teacher.maxHours}`}
+        />
+      )}
     </div>
   )
 }

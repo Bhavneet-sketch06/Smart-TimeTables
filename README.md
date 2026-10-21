@@ -17,6 +17,8 @@ from public documents on cse.gndec.ac.in: the July–Dec 2026 subject allotment,
 (08:30–17:30, lunch 12:30–13:30, labs in half-groups A1/A2) and the room/lab infrastructure lists. It generates in
 well under a second with zero clashes. It is a realistic sample, **not** the official GNDEC timetable.
 
+Every timetable has a **Print** button that prints just the timetable on one A4 landscape page.
+
 ## AI timetable assistant
 The **Ask AI** button (bottom-right of every app screen) answers questions about the current timetable, e.g.
 "When is D3 CS A free on Wednesday?". It calls `api/chat.js`, which uses Claude (`claude-opus-5-5`) on the server so
@@ -29,7 +31,7 @@ the API key is never sent to the browser.
 ## Roles
 - **Administrator**: 5-step setup wizard (time structure → rooms → subjects → teachers → sections), then generate and review.
 - **HOD / Coordinator**: timetables by section, teacher or room, filtered by department, with clash count and quality score.
-- **Faculty**: pick your name to see your weekly schedule and load.
+- **Faculty**: pick your name (and optionally a year/class such as D2 or D3) to see your weekly schedule and load.
 - **Student**: pick department and section to see a read-only, mobile-friendly timetable.
 
 ## How the scheduler works (`src/scheduler.js`)
