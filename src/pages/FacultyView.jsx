@@ -36,10 +36,13 @@ export default function FacultyView({ data }) {
   const teacher = teachers.find((t) => t.id === pick.teacherId) ?? teachers[0]
   const allEntries = data.timetable.entries.filter((e) => e.teacherId === teacher?.id)
 
-  // Years / classes this teacher teaches, taken from the sections' department (e.g. "CSE - 3rd Sem (D2)").
-  const years = [...new Set(allEntries.map((e) => sectionsById.get(e.sectionId)?.department).filter(Boolean))].sort()
+  // Every year / class in the college (sections' department, e.g. "CSE - 3rd Sem (D2)"), with this
+  // teacher's periods in each, so the menu always works even for someone who teaches a single year.
+  const yearOf = (e) => sectionsById.get(e.sectionId)?.department
+  const years = [...new Set(data.sections.map((s) => s.department).filter(Boolean))].sort()
+  const periodsIn = (y) => periodsOf(allEntries.filter((e) => yearOf(e) === y))
   const year = years.includes(pick.year) ? pick.year : ''
-  const entries = year ? allEntries.filter((e) => sectionsById.get(e.sectionId)?.department === year) : allEntries
+  const entries = year ? allEntries.filter((e) => yearOf(e) === year) : allEntries
   const sectionCount = new Set(entries.map((e) => e.sectionId)).size
 
   return (
@@ -55,9 +58,10 @@ export default function FacultyView({ data }) {
         <Select
           label="Year / class"
           value={year}
-          options={[{ value: '', label: `All years (${years.length})` }].concat(years)}
+          options={[{ value: '', label: `All years · ${plural(periodsOf(allEntries), 'period')}` }].concat(
+            years.map((y) => ({ value: y, label: `${y} · ${plural(periodsIn(y), 'period')}` })),
+          )}
           onChange={(e) => save({ teacherId: teacher?.id, year: e.target.value })}
-          disabled={years.length < 2}
         />
       </Card>
       {teacher && (
@@ -66,7 +70,11 @@ export default function FacultyView({ data }) {
           entries={entries}
           mode="teacher"
           title={teacher.name}
-          subtitle={`${year || 'All years'} · weekly teaching schedule`}
+          subtitle={
+            year && entries.length === 0
+              ? `No classes in ${year} this week`
+              : `${year || 'All years'} · weekly teaching schedule`
+          }
           stats={`${plural(periodsOf(entries), 'period')} · ${plural(sectionCount, 'section')} · total load ${periodsOf(allEntries)} / ${teacher.maxHours}`}
         />
       )}

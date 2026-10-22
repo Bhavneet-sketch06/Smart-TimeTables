@@ -9,7 +9,7 @@ npm run dev
 ```
 Open http://localhost:5173 → **Administrator** → **Load GNDEC CSE (real data)** or **Load demo college** → go to **Sections** → **Generate timetable**.
 
-Use the ☀️ / 🌙 / 💻 switch for light, dark or system theme, and the **A A A** switch for text size.
+Use the ☀️ / 🌙 / 💻 switch for light, dark or system theme.
 
 ## GNDEC Ludhiana data
 `src/data/gndecCse.js` models the CSE department's B.Tech 3rd and 5th semesters (sections A–F each, 354 classes a week)

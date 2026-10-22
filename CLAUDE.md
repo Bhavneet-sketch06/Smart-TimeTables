@@ -36,7 +36,7 @@ src/
     demoCollege.js               # sample college (3 depts, 6 sections, 12 teachers, 8 rooms)
     gndecCse.js                  # real GNDEC Ludhiana CSE data (Jul-Dec 2026, 12 sections, lab groups A1/A2)
   hooks/useCollegeData.js        # localStorage-backed state (key `ttgen:v1`)
-  hooks/usePrefs.js              # theme (light/dark/system) + text size (key `ttgen:prefs`)
+  hooks/usePrefs.js              # theme (light/dark/system) (key `ttgen:prefs`)
   theme-dark.css                 # GENERATED: dark theme flips Tailwind colour scales under `.dark`
   components/                    # TimetableGrid (days across, times down, legend), TimetableSheet (title + Print),
                                  # SummaryPanel, PrefsControls, ChatWidget, ui bits
@@ -86,7 +86,7 @@ blocks only its own group, so groups can be in different labs at the same time.
 - Styling with Tailwind utility classes only. No `dark:` variants needed: dark mode comes from `theme-dark.css`
   (regenerate it from `node_modules/tailwindcss/theme.css` if you use a new colour hue). Use fixed hex
   arbitrary values (e.g. `bg-[#4f46e5]`) only for things that must look the same in both themes.
-- Root font size is set by the text-size preference (16/18/20px); size things in rem-based utilities.
+- Root font size is a fixed 18px (index.css); size things in rem-based utilities.
 - Printing: render timetables through `TimetableSheet` and mark everything else `print:hidden`; index.css sets
   A4 landscape and a smaller root font for print, and usePrefs switches to the light theme while printing.
 - Keep components small and functional; state flows from `useCollegeData` in `App.jsx` via props.

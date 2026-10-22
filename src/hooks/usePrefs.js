@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 
-// Per-viewer display preferences. index.html applies the same logic before first paint.
+// Per-viewer display preference (theme). index.html applies the same logic before first paint.
 const PREFS_KEY = 'ttgen:prefs'
-export const TEXT_SIZES = { normal: 16, large: 18, xl: 20 }
-const DEFAULTS = { theme: 'system', textSize: 'large' }
+const DEFAULTS = { theme: 'system' }
 
 function readPrefs() {
   try {
@@ -24,7 +23,6 @@ export function usePrefs() {
       root.classList.toggle('dark', dark)
     }
     apply()
-    root.style.fontSize = `${TEXT_SIZES[prefs.textSize] ?? 18}px`
     try {
       localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
     } catch {
