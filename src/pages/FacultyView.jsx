@@ -15,6 +15,13 @@ function readPick() {
   }
 }
 
+/** Id of the faculty member chosen in the Faculty view (or the first teacher alphabetically). */
+export function currentFacultyId(data) {
+  const id = readPick().teacherId
+  if (data.teachers.some((t) => t.id === id)) return id
+  return [...data.teachers].sort((a, b) => a.name.localeCompare(b.name))[0]?.id
+}
+
 const periodsOf = (entries) => entries.reduce((n, e) => n + e.length, 0)
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
 

@@ -19,6 +19,15 @@ well under a second with zero clashes. It is a realistic sample, **not** the off
 
 Every timetable has a **Print** button that prints just the timetable on one A4 landscape page.
 
+## Book a Space
+Faculty, HODs and admins can book rooms for one-off events (workshops, seminars, guest lectures, extra classes,
+meetings) from the **Book a space** tab: event details → date & time (with optional setup/cleanup time) → choose
+from the rooms that are free for the whole period → review → confirm. A room is offered only if it is big enough,
+of the right type, has the requested equipment, and has no regular class and no other booking in that interval.
+If nothing fits, the app says why and suggests nearby free times. Confirmed bookings get a printable receipt
+with a booking ID, and appear under **My bookings** (faculty) or **All bookings** (HOD/admin), where they can be
+cancelled. Loading the GNDEC or demo data adds three sample bookings for the next working day.
+
 ## AI timetable assistant
 The **Ask AI** button (bottom-right of every app screen) answers questions about the current timetable, e.g.
 "When is D3 CS A free on Wednesday?". It calls `api/chat.js`, which uses Claude (`claude-opus-5-5`) on the server so

@@ -3,7 +3,8 @@
  *
  * time:     { days: string[], periodsPerDay, breakAfter, startTime: 'HH:MM', periodMinutes, breakMinutes }
  *           breakAfter = number of periods before the break (0 = no break)
- * rooms:    { id, name, capacity, type: 'classroom' | 'lab' | 'seminar' }
+ * rooms:    { id, name, capacity, type: 'classroom' | 'lab' | 'seminar', facilities?: string[], eventsOnly?: boolean }
+ *           eventsOnly rooms are never used for regular classes, only for Book a Space bookings
  * teachers: { id, name, department, subjectIds: string[], maxHours, unavailable: string[] }
  *           unavailable slot keys look like "Mon-1" (1-based period)
  * subjects: { id, name, code, lectureHours, labHours }
@@ -11,6 +12,7 @@
  * sections: { id, name, department, students, assignments: { subjectId, teacherId }[] }
  * timetable: null | { entries, stats, generatedAt }
  * meta:     null | { name, note }   where the data came from (shown in the UI)
+ * bookings: one-off room bookings (see src/booking.js); kept when the timetable is regenerated
  * sections may also have labGroups (e.g. 2) and groupNames (e.g. ['A1', 'A2']); labs then run per group.
  * subjects may have labSessions (lab blocks per group per week, default 1);
  * assignments may have labTeacherId when the lab is taught by someone else.
@@ -35,6 +37,7 @@ export function emptyCollege() {
     subjects: [],
     sections: [],
     timetable: null,
+    bookings: [],
   }
 }
 

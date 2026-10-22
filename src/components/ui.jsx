@@ -55,3 +55,26 @@ export function EmptyState({ children }) {
     <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">{children}</p>
   )
 }
+
+/** Underlined tab bar used for the sections of a role's page. tabs: [{ id, label, Icon?, badge? }] */
+export function Tabs({ tabs, value, onChange }) {
+  return (
+    <div className="flex gap-1 overflow-x-auto border-b border-slate-200 print:hidden">
+      {tabs.map(({ id, label, Icon, badge }) => (
+        <button
+          key={id}
+          onClick={() => onChange(id)}
+          className={`-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-2.5 font-medium ${
+            value === id ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          {Icon && <Icon className="h-4 w-4" />}
+          {label}
+          {badge > 0 && (
+            <span className="rounded-full bg-indigo-100 px-2 text-xs font-semibold text-indigo-700">{badge}</span>
+          )}
+        </button>
+      ))}
+    </div>
+  )
+}

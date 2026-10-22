@@ -1,4 +1,20 @@
 import { periodTimes } from '../data/schema.js'
+import { formatDate, timeRange, upcomingBookings } from '../booking.js'
+
+/** Upcoming one-off room bookings (Book a Space), soonest first. */
+function bookingLines(data) {
+  const rooms = new Map(data.rooms.map((r) => [r.id, r]))
+  const upcoming = upcomingBookings(data.bookings ?? [])
+  if (!upcoming.length) return ['', 'ROOM BOOKINGS: none upcoming.']
+  return [
+    '',
+    'ROOM BOOKINGS (one-off events booked with Book a Space; the room is taken for that time on that date only)',
+    ...upcoming.map(
+      (b) =>
+        `- ${formatDate(b.date)} ${timeRange(b)}${b.setup || b.cleanup ? ` (+${b.setup} min setup, +${b.cleanup} min cleanup)` : ''}: ${b.title} [${b.eventType}] in ${rooms.get(b.roomId)?.name ?? 'removed room'}, organizer ${b.organizerName}, ${b.attendance} people, ID ${b.id}`,
+    ),
+  ]
+}
 
 /**
  * Compact plain-text description of the college data and generated timetable, sent to the assistant.
@@ -19,7 +35,10 @@ export function buildTimetableContext(data) {
   if (breakSlot) lines.push(`Break: ${breakSlot.label} (after P${data.time.breakAfter})`)
 
   lines.push('', 'ROOMS')
-  for (const r of data.rooms) lines.push(`- ${r.name}: ${r.type}, ${r.capacity} seats`)
+  for (const r of data.rooms) {
+    const extras = [r.facilities?.length ? `facilities: ${r.facilities.join(', ')}` : '', r.eventsOnly ? 'events only, no regular classes' : '']
+    lines.push(`- ${r.name}: ${r.type}, ${r.capacity} seats${extras.filter(Boolean).map((x) => `; ${x}`).join('')}`)
+  }
 
   lines.push('', 'TEACHERS')
   for (const t of data.teachers) {
@@ -46,7 +65,7 @@ export function buildTimetableContext(data) {
   const tt = data.timetable
   if (!tt) {
     lines.push('', 'TIMETABLE: not generated yet. The administrator can generate it from Setup > Sections > Generate timetable.')
-    return lines.join('\n')
+    return [...lines, ...bookingLines(data)].join('\n')
   }
 
   lines.push('', `TIMETABLE: ${tt.stats.placed}/${tt.stats.total} classes placed, ${tt.stats.clashes} clashes, quality ${tt.stats.quality}/100`)
@@ -65,5 +84,5 @@ export function buildTimetableContext(data) {
       lines.push(`${day}: ${text.length ? text.join(' | ') : 'no classes'}`)
     })
   }
-  return lines.join('\n')
+  return [...lines, ...bookingLines(data)].join('\n')
 }

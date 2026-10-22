@@ -3,13 +3,16 @@ import { useCollegeData } from './hooks/useCollegeData.js'
 import { usePrefs } from './hooks/usePrefs.js'
 import PrefsControls from './components/PrefsControls.jsx'
 import Landing from './pages/Landing.jsx'
-import { CalendarDays } from 'lucide-react'
-import { Button } from './components/ui.jsx'
+import { CalendarDays, CalendarPlus, ClipboardList, LayoutGrid, Settings2, Ticket } from 'lucide-react'
+import { Button, Tabs } from './components/ui.jsx'
 import ChatWidget from './components/ChatWidget.jsx'
 import AdminWizard from './pages/admin/AdminWizard.jsx'
 import TimetableViews from './pages/TimetableViews.jsx'
-import FacultyView from './pages/FacultyView.jsx'
+import FacultyView, { currentFacultyId } from './pages/FacultyView.jsx'
 import StudentView from './pages/StudentView.jsx'
+import BookSpace from './pages/booking/BookSpace.jsx'
+import BookingsList from './pages/booking/BookingsList.jsx'
+import { upcomingBookings } from './booking.js'
 
 const ROLE_KEY = 'ttgen:role'
 const ROLE_LABELS = { admin: 'Administrator', hod: 'HOD / Coordinator', faculty: 'Faculty', student: 'Student' }
@@ -62,10 +65,10 @@ export default function App() {
           </div>
         </div>
       </header>
-      <main className="w-full px-4 py-6 sm:px-6 lg:px-8 print:p-0">
+      <main className="w-full px-4 pb-28 pt-6 sm:px-6 lg:px-8 print:p-0">
         {view === 'admin' && <AdminPage college={college} />}
-        {view === 'hod' && <TimetableViews data={college.data} withDepartmentFilter />}
-        {view === 'faculty' && <FacultyView data={college.data} />}
+        {view === 'hod' && <HodPage college={college} />}
+        {view === 'faculty' && <FacultyPage college={college} />}
         {view === 'student' && <StudentView data={college.data} />}
       </main>
       <ChatWidget data={college.data} />
@@ -73,31 +76,117 @@ export default function App() {
   )
 }
 
+const BOOK_TAB = { id: 'book', label: 'Book a space', Icon: CalendarPlus }
+
+/** Booking tabs shared by every role that can book rooms. */
+function BookingTabs({ tab, setTab, college, organizer, createdBy, mine, listTitle, canCancel }) {
+  const all = college.data.bookings ?? []
+  const shown = mine ? all.filter(mine) : all
+  if (tab === 'book') {
+    return <BookSpace college={college} organizer={organizer} createdBy={createdBy} onViewBookings={() => setTab('bookings')} />
+  }
+  if (tab === 'bookings') {
+    return (
+      <BookingsList
+        data={college.data}
+        bookings={shown}
+        title={listTitle}
+        canCancel={canCancel}
+        onCancel={college.cancelBooking}
+        onAddSamples={all.length === 0 && college.data.rooms.length ? college.addSampleBookings : undefined}
+      />
+    )
+  }
+  return null
+}
+
 function AdminPage({ college }) {
   const [tab, setTab] = useState(college.data.timetable ? 'timetable' : 'setup')
+  const upcoming = upcomingBookings(college.data.bookings ?? []).length
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2 border-b border-slate-200 print:hidden">
-        {[
-          ['setup', 'Setup'],
-          ['timetable', 'Timetable'],
-        ].map(([id, label]) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
-              tab === id ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {tab === 'setup' ? (
-        <AdminWizard college={college} onGenerated={() => setTab('timetable')} />
-      ) : (
-        <TimetableViews data={college.data} />
-      )}
+    <div className="space-y-5">
+      <Tabs
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { id: 'setup', label: 'Setup', Icon: Settings2 },
+          { id: 'timetable', label: 'Timetable', Icon: LayoutGrid },
+          BOOK_TAB,
+          { id: 'bookings', label: 'All bookings', Icon: Ticket, badge: upcoming },
+        ]}
+      />
+      {tab === 'setup' && <AdminWizard college={college} onGenerated={() => setTab('timetable')} />}
+      {tab === 'timetable' && <TimetableViews data={college.data} />}
+      <BookingTabs
+        tab={tab}
+        setTab={setTab}
+        college={college}
+        createdBy={{ role: 'admin' }}
+        listTitle="All bookings"
+        canCancel={() => true}
+      />
+    </div>
+  )
+}
+
+function HodPage({ college }) {
+  const [tab, setTab] = useState('timetables')
+  const upcoming = upcomingBookings(college.data.bookings ?? []).length
+  return (
+    <div className="space-y-5">
+      <Tabs
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { id: 'timetables', label: 'Timetables', Icon: ClipboardList },
+          BOOK_TAB,
+          { id: 'bookings', label: 'All bookings', Icon: Ticket, badge: upcoming },
+        ]}
+      />
+      {tab === 'timetables' && <TimetableViews data={college.data} withDepartmentFilter />}
+      {/* Coordinators can see and cancel every booking. */}
+      <BookingTabs
+        tab={tab}
+        setTab={setTab}
+        college={college}
+        createdBy={{ role: 'hod' }}
+        listTitle="All bookings"
+        canCancel={() => true}
+      />
+    </div>
+  )
+}
+
+function FacultyPage({ college }) {
+  const [tab, setTab] = useState('timetable')
+  // The faculty member picked on the "My timetable" tab is "you" for booking.
+  const teacherId = currentFacultyId(college.data)
+  const teacher = college.data.teachers.find((t) => t.id === teacherId)
+  const isMine = (b) => b.organizerId === teacherId || b.createdBy?.teacherId === teacherId
+  const upcoming = upcomingBookings((college.data.bookings ?? []).filter(isMine)).length
+  return (
+    <div className="space-y-5">
+      <Tabs
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { id: 'timetable', label: 'My timetable', Icon: LayoutGrid },
+          BOOK_TAB,
+          { id: 'bookings', label: 'My bookings', Icon: Ticket, badge: upcoming },
+        ]}
+      />
+      {tab === 'timetable' && <FacultyView data={college.data} />}
+      <BookingTabs
+        key={teacherId}
+        tab={tab}
+        setTab={setTab}
+        college={college}
+        organizer={teacher}
+        createdBy={{ role: 'faculty', teacherId }}
+        mine={isMine}
+        listTitle={teacher ? `My bookings · ${teacher.name}` : 'My bookings'}
+        canCancel={isMine}
+      />
     </div>
   )
 }

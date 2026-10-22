@@ -36,7 +36,8 @@ export function groupNamesOf(section) {
 }
 
 function roomFits(room, kind, students) {
-  if (room.capacity < students) return false
+  // Events-only rooms (e.g. a seminar hall kept for bookings) never hold regular classes.
+  if (room.eventsOnly || room.capacity < students) return false
   return kind === 'lab' ? room.type === 'lab' : LECTURE_ROOM_TYPES.has(room.type)
 }
 
@@ -162,8 +163,8 @@ export function precheck(data) {
     }
   }
 
-  const lectureRooms = data.rooms.filter((r) => LECTURE_ROOM_TYPES.has(r.type)).length
-  const labRooms = data.rooms.filter((r) => r.type === 'lab').length
+  const lectureRooms = data.rooms.filter((r) => !r.eventsOnly && LECTURE_ROOM_TYPES.has(r.type)).length
+  const labRooms = data.rooms.filter((r) => !r.eventsOnly && r.type === 'lab').length
   if (lectureDemand > lectureRooms * ctx.S) {
     problems.push(
       `Sections need ${lectureDemand} lecture periods, but ${lectureRooms} classroom(s) only offer ${lectureRooms * ctx.S}.`,

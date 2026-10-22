@@ -28,7 +28,8 @@ deployed as serverless functions automatically. Set `ANTHROPIC_API_KEY` in Proje
 api/chat.js                      # assistant endpoint: validates input, streams Claude's answer as plain text
 src/
   main.jsx, App.jsx, index.css   # entry, view switcher, Tailwind import
-  chat/timetableContext.js       # data + timetable -> compact deterministic text for the assistant (cached)
+  chat/timetableContext.js       # data + timetable + bookings -> compact text for the assistant (cached)
+  booking.js, booking.test.js    # PURE JS: Book a Space room checks, suggestions, demo bookings (seedBookings)
   scheduler.js                   # PURE JS: precheck, generateTimetable, findClashes, scoreQuality
   scheduler.test.js              # runs scheduler on demo data, asserts zero clashes
   data/
@@ -46,6 +47,7 @@ src/
                                  # (subjects before teachers so "can teach" has options); listUtils.js helpers
     TimetableViews.jsx           # section / teacher / room tabs + summary (Admin, HOD)
     FacultyView.jsx, StudentView.jsx
+    booking/                     # BookSpace (4-step flow + receipt), BookingsList, BookingReceipt
 ```
 
 ## Data model (localStorage key `ttgen:v1`)
@@ -60,8 +62,12 @@ src/
   sections: [{ id, name, department, students, labGroups?, groupNames?,
                assignments: [{ subjectId, teacherId, labTeacherId? }] }],
   timetable: null | { entries, stats, generatedAt },
+  bookings: [{ id, status: "confirmed" | "cancelled", eventType, title, department, organizerId?, organizerName,
+               attendance, notes, facilities, roomId, date: "YYYY-MM-DD", start: "HH:MM", duration, setup, cleanup,
+               createdAt, createdBy: { role, teacherId? } }],
 }
 ```
+Rooms may have `facilities: string[]` and `eventsOnly: true` (never used for classes, only bookings).
 Timetable entry: `{ sectionId, subjectId, teacherId, roomId, day, period, length, kind: "lecture" | "lab", group?, groupIndex? }`. `day` is a 0-based index, `period` is 0-based internally.
 
 Lab groups: a section with `labGroups: 2` takes each lab as two group units (e.g. A1, A2), each needing a lab
@@ -92,5 +98,9 @@ blocks only its own group, so groups can be in different labs at the same time.
 - Keep components small and functional; state flows from `useCollegeData` in `App.jsx` via props.
 - Other localStorage keys (`ttgen:role`, `ttgen:student`, `ttgen:faculty`) are per-viewer conveniences only; wrap all storage access in try/catch.
 - Editing any input through `update()` clears the stored timetable (it would be stale).
+- Book a Space: bookings change only through `bookSpace` / `cancelBooking` / `addSampleBookings` in
+  `useCollegeData`, which re-read the saved bookings, re-check the room and write immediately. The autosave
+  effect always keeps the saved bookings (never the in-memory copy), and a `storage` listener syncs other tabs.
+  Roles: Faculty books as themselves and cancels their own; HOD and Admin see and cancel all; no approvals.
 - Build in small steps; commit after each working step. Run `npm test` and `npm run build` before committing.
 - `.claude/launch.json` defines the `dev` preview server (port 5173).

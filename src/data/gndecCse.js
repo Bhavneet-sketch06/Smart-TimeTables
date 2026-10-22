@@ -136,6 +136,9 @@ function buildSections() {
   return sections
 }
 
+// Facilities follow the infrastructure lists (every classroom and lab has a projector; labs have computers and ACs).
+const LAB = ['Computers', 'Projector', 'Air conditioning']
+
 const ROOMS = [
   // Classrooms seen in the published timetable; S-218, G-17, G-18 capacities from the infrastructure list.
   ...['G12', 'G13', 'G14', 'G15', 'G16', 'G17', 'G18', 'S213', 'S214', 'S218'].map((name) => ({
@@ -143,17 +146,22 @@ const ROOMS = [
     name,
     capacity: 75,
     type: 'classroom',
+    facilities: ['Projector'],
   })),
-  { id: 'sl1', name: 'Software Lab-I', capacity: 35, type: 'lab' },
-  { id: 'sl2', name: 'Software Lab-II', capacity: 34, type: 'lab' },
-  { id: 'sl3', name: 'Software Lab-III', capacity: 35, type: 'lab' },
-  { id: 'sl4', name: 'Software Lab-IV', capacity: 30, type: 'lab' },
-  { id: 'pl', name: 'Project Lab', capacity: 35, type: 'lab' },
-  { id: 'rlab', name: 'Research Lab', capacity: 28, type: 'lab' },
-  { id: 'oslab', name: 'Operating Systems Lab', capacity: 25, type: 'lab' },
-  // DBMS and Hardware lab capacities are not published; 30 is assumed.
-  { id: 'dbmslab', name: 'DBMS Lab', capacity: 30, type: 'lab' },
-  { id: 'hwlab', name: 'Hardware Lab', capacity: 30, type: 'lab' },
+  { id: 'sl1', name: 'Software Lab-I', capacity: 35, type: 'lab', facilities: LAB },
+  { id: 'sl2', name: 'Software Lab-II', capacity: 34, type: 'lab', facilities: LAB },
+  { id: 'sl3', name: 'Software Lab-III', capacity: 35, type: 'lab', facilities: LAB },
+  { id: 'sl4', name: 'Software Lab-IV', capacity: 30, type: 'lab', facilities: LAB },
+  { id: 'pl', name: 'Project Lab', capacity: 35, type: 'lab', facilities: LAB },
+  { id: 'rlab', name: 'Research Lab', capacity: 28, type: 'lab', facilities: LAB },
+  { id: 'oslab', name: 'Operating Systems Lab', capacity: 25, type: 'lab', facilities: LAB },
+  // DBMS and Hardware lab capacities and equipment are not published; 30 seats is assumed.
+  { id: 'dbmslab', name: 'DBMS Lab', capacity: 30, type: 'lab', facilities: ['Computers'] },
+  { id: 'hwlab', name: 'Hardware Lab', capacity: 30, type: 'lab', facilities: [] },
+  // Kept for events only (Book a Space), never for regular classes. The hall appears in the published
+  // timetable (capacity and equipment assumed); the library's 15 seats and projector are from the infrastructure list.
+  { id: 'wshall', name: 'WS Seminar Hall', capacity: 150, type: 'seminar', eventsOnly: true, facilities: ['Projector', 'Sound system', 'Air conditioning'] },
+  { id: 'deptlib', name: 'Departmental Library', capacity: 15, type: 'seminar', eventsOnly: true, facilities: ['Projector'] },
 ]
 
 export function gndecCse() {

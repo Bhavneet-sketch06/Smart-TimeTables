@@ -25,4 +25,16 @@ html {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  /* Printing a single element (e.g. a booking receipt): hide everything else. */
+  html.printing-one body * {
+    visibility: hidden;
+  }
+  html.printing-one [data-print-target],
+  html.printing-one [data-print-target] * {
+    visibility: visible;
+  }
+  html.printing-one [data-print-target] {
+    position: absolute;
+    inset: 0 0 auto 0;
+  }
 }

@@ -1,4 +1,4 @@
-// Sample college: 3 departments, 6 sections, 12 teachers, 8 rooms (2 labs).
+// Sample college: 3 departments, 6 sections, 12 teachers, 8 rooms (2 labs, 1 events-only seminar hall).
 // Mon-Fri, 7 periods, break after period 4. Each section has 21 hours/week.
 
 const subjects = [
@@ -38,14 +38,15 @@ const teachers = [
 ]
 
 const rooms = [
-  { id: 'r101', name: 'Room 101', capacity: 60, type: 'classroom' },
-  { id: 'r102', name: 'Room 102', capacity: 60, type: 'classroom' },
-  { id: 'r103', name: 'Room 103', capacity: 65, type: 'classroom' },
-  { id: 'r104', name: 'Room 104', capacity: 70, type: 'classroom' },
-  { id: 'r105', name: 'Room 105', capacity: 70, type: 'classroom' },
-  { id: 'sh1', name: 'Seminar Hall', capacity: 120, type: 'seminar' },
-  { id: 'lab1', name: 'Computer Lab', capacity: 65, type: 'lab' },
-  { id: 'lab2', name: 'Engineering Lab', capacity: 65, type: 'lab' },
+  { id: 'r101', name: 'Room 101', capacity: 60, type: 'classroom', facilities: ['Projector'] },
+  { id: 'r102', name: 'Room 102', capacity: 60, type: 'classroom', facilities: [] },
+  { id: 'r103', name: 'Room 103', capacity: 65, type: 'classroom', facilities: ['Projector'] },
+  { id: 'r104', name: 'Room 104', capacity: 70, type: 'classroom', facilities: ['Projector'] },
+  { id: 'r105', name: 'Room 105', capacity: 70, type: 'classroom', facilities: [] },
+  // Kept for events (Book a Space); never used for regular classes.
+  { id: 'sh1', name: 'Seminar Hall', capacity: 120, type: 'seminar', eventsOnly: true, facilities: ['Projector', 'Sound system', 'Air conditioning'] },
+  { id: 'lab1', name: 'Computer Lab', capacity: 65, type: 'lab', facilities: ['Computers', 'Projector'] },
+  { id: 'lab2', name: 'Engineering Lab', capacity: 65, type: 'lab', facilities: ['Projector'] },
 ]
 
 const sec = (id, name, department, students, pairs) => ({

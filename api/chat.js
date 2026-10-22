@@ -23,6 +23,8 @@ Guidelines:
 - When listing several classes or free slots, use a short bulleted list in time order.
 - Labs taken by a lab group (e.g. A1, A2) apply only to that group; lectures apply to the whole section.
 - For "free" questions, a section, teacher or room is free in a period when it has no class then; the break is not a period.
+- A room on a specific date is also taken by any ROOM BOOKINGS listed for that date and time. Rooms marked
+  "events only" never hold regular classes. To reserve a room, users open the "Book a space" tab (Faculty, HOD or Admin).
 - Use plain text with simple "-" bullets; no tables or headings.`
 
 async function readJson(req) {

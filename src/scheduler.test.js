@@ -126,10 +126,17 @@ describe('pre-check and failure reasons', () => {
     const data = demoCollege()
     data.sections.forEach((s) => (s.students = 100))
     data.rooms.forEach((r) => r.type === 'lab' && (r.capacity = 100))
+    data.rooms.find((r) => r.id === 'sh1').eventsOnly = false // let the seminar hall take classes here
     expect(precheck(data).ok).toBe(true)
     const result = generateTimetable(data, { seed: 1, timeLimitMs: 500 })
     expect(result.ok).toBe(false)
     expect(result.reason).toMatch(/^Couldn't place .+ Try adding/)
+  })
+
+  test('events-only rooms are never used for regular classes', () => {
+    const data = demoCollege()
+    const { entries } = generateTimetable(data, { seed: 4 })
+    expect(entries.some((e) => e.roomId === 'sh1')).toBe(false)
   })
 
   test('findClashes detects a double-booked teacher', () => {
