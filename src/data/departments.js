@@ -130,3 +130,18 @@ export function mergeDepartmentTimetable(data, deptId, fixedEntries, result) {
     generatedAt: new Date().toISOString(),
   }
 }
+
+/** Number of classes a department's sections need per week (lectures + every lab session of every lab group). */
+export function expectedClasses(data, deptId) {
+  const subjects = new Map(data.subjects.map((s) => [s.id, s]))
+  let n = 0
+  for (const sec of sectionsOf(data, deptId)) {
+    const groups = Math.max(1, sec.labGroups || 1)
+    for (const a of sec.assignments) {
+      const sub = subjects.get(a.subjectId)
+      if (!sub) continue
+      n += (sub.lectureHours || 0) + (sub.labHours > 0 ? Math.max(1, sub.labSessions || 1) * groups : 0)
+    }
+  }
+  return n
+}

@@ -37,7 +37,15 @@ export default function StepRooms({ data, update }) {
             onBlur={(e) =>
               patch(r.id, { facilities: [...new Set(e.target.value.split(',').map((f) => f.trim()).filter(Boolean))] })
             }
-            className="col-span-2 sm:col-span-3"
+            className="col-span-2"
+          />
+          <Select
+            label="Home department"
+            value={r.deptId ?? ''}
+            options={[{ value: '', label: 'Shared (any department)' }].concat(
+              (data.departments ?? []).map((d) => ({ value: d.id, label: d.short })),
+            )}
+            onChange={(e) => patch(r.id, { deptId: e.target.value || null })}
           />
           <label className="col-span-2 flex items-center gap-2 pb-2 text-sm text-slate-600 sm:col-span-1">
             <input

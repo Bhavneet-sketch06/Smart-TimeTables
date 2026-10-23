@@ -16,6 +16,7 @@ import {
   windowOf,
 } from '../../booking.js'
 import { departmentsOf, periodTimes } from '../../data/schema.js'
+import { deptById } from '../../data/departments.js'
 import { Button, Card, Field, Select } from '../../components/ui.jsx'
 import BookingReceipt from './BookingReceipt.jsx'
 import { DAY_NAMES } from '../../components/TimetableGrid.jsx'
@@ -25,13 +26,15 @@ const DURATIONS = [30, 60, 90, 120, 180, 240, 300]
 const BUFFERS = [0, 15, 30, 45, 60]
 const minutesLabel = (m) => (m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`)
 
-function initialRequest(data, teacher) {
+function initialRequest(data, teacher, deptId) {
+  const dept = deptById(data, deptId) ?? deptById(data, teacher?.deptId)
   return {
     eventType: 'Workshop',
     title: '',
     organizerId: teacher?.id ?? '',
     organizerName: teacher?.name ?? '',
-    department: teacher?.department ?? departmentsOf(data)[0] ?? '',
+    department: dept?.short ?? teacher?.department ?? departmentsOf(data)[0] ?? '',
+    deptId: dept?.id ?? null,
     attendance: 30,
     notes: '',
     facilities: [],
@@ -77,9 +80,9 @@ function Chip({ active, onClick, children }) {
  * Book a room for a one-off event. `organizer` is the signed-in faculty member when known (pre-fills the form);
  * `createdBy` is stored on the booking so "My bookings" can find it.
  */
-export default function BookSpace({ college, organizer, createdBy, onViewBookings }) {
+export default function BookSpace({ college, organizer, createdBy, deptId, onViewBookings }) {
   const { data, bookSpace } = college
-  const [req, setReq] = useState(() => initialRequest(data, organizer))
+  const [req, setReq] = useState(() => initialRequest(data, organizer, deptId))
   const [step, setStep] = useState(0)
   const [errors, setErrors] = useState([])
   const [roomId, setRoomId] = useState('')
@@ -130,7 +133,7 @@ export default function BookSpace({ college, organizer, createdBy, onViewBooking
   }
 
   const reset = () => {
-    setReq(initialRequest(data, organizer))
+    setReq(initialRequest(data, organizer, deptId))
     setStep(0)
     setRoomId('')
     setErrors([])
@@ -231,7 +234,7 @@ export default function BookSpace({ college, organizer, createdBy, onViewBooking
                   .concat([{ value: '__other', label: 'Someone else…' }])}
                 onChange={(e) => {
                   const t = teachers.find((x) => x.id === e.target.value)
-                  if (t) set({ organizerId: t.id, organizerName: t.name, department: t.department || req.department })
+                  if (t) set({ organizerId: t.id, organizerName: t.name })
                   else set({ organizerId: '', organizerName: e.target.value === '__other' ? ' ' : '' })
                 }}
               />
@@ -239,7 +242,7 @@ export default function BookSpace({ college, organizer, createdBy, onViewBooking
                 label="Department"
                 value={req.department}
                 options={[...new Set([req.department, ...departments])].filter(Boolean)}
-                onChange={(e) => set({ department: e.target.value })}
+                onChange={(e) => set({ department: e.target.value, deptId: (data.departments ?? []).find((d) => d.short === e.target.value)?.id ?? null })}
               />
               <Field
                 label="Expected attendance"

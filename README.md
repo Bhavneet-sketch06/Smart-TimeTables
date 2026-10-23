@@ -7,7 +7,7 @@ Generate clash-free weekly timetables for any college, entirely in the browser. 
 npm install
 npm run dev
 ```
-Open http://localhost:5173 → **Administrator** → **Load GNDEC CSE (real data)** or **Load demo college** → go to **Sections** → **Generate timetable**.
+Open http://localhost:5173 → **Administrator** → **Load GNDEC demo (CSE + sample departments)** or **Load demo college** → go to **Sections** → **Generate whole college**.
 
 Use the ☀️ / 🌙 / 💻 switch for light, dark or system theme.
 
@@ -18,6 +18,18 @@ from public documents on cse.gndec.ac.in: the July–Dec 2026 subject allotment,
 well under a second with zero clashes. It is a realistic sample, **not** the official GNDEC timetable.
 
 Every timetable has a **Print** button that prints just the timetable on one A4 landscape page.
+
+## Departments
+After choosing a role, pick a department from the department bar (CSE, ECE, ME, Civil, EE in the GNDEC demo).
+Everything follows that choice: timetables, setup lists, generation, faculty and student pickers, bookings.
+- **Administrator**: any department or *All departments*; can set up and generate one department or the whole college.
+- **HOD / Coordinator**: picks the department they coordinate once (demo assignment) and only sees that department.
+- **Faculty / Student**: pick their department; faculty still see their full week if they teach in several departments.
+
+Rooms are shared college-wide. Generating one department keeps every other department's classes and works around
+their rooms and shared teachers, so a room can never be double-booked across departments. In the GNDEC demo, CSE is
+built from real GNDEC documents; ECE, Mechanical and Civil are **sample** departments (made-up faculty and subjects)
+that share lecture theatres and Applied Sciences/Humanities teachers; Electrical is listed but not set up.
 
 ## Book a Space
 Faculty, HODs and admins can book rooms for one-off events (workshops, seminars, guest lectures, extra classes,

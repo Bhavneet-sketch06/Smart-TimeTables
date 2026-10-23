@@ -1,12 +1,15 @@
 import { uid } from '../../data/schema.js'
+import { ALL, deptById, subjectsOf } from '../../data/departments.js'
 import { Button, EmptyState, Field } from '../../components/ui.jsx'
 import { patchItem, removeItem, toNumber } from './listUtils.js'
 
-export default function StepSubjects({ data, update }) {
+export default function StepSubjects({ data, update, deptId = ALL }) {
+  const dept = deptId === ALL ? null : deptById(data, deptId)
+  const shown = subjectsOf(data, deptId)
   const add = () =>
     update('subjects', (subjects) => [
       ...subjects,
-      { id: uid('sub'), name: 'New subject', code: '', lectureHours: 3, labHours: 0 },
+      { id: uid('sub'), name: 'New subject', code: '', lectureHours: 3, labHours: 0, deptId: dept?.id ?? null },
     ])
   const patch = (id, changes) => update('subjects', (subjects) => patchItem(subjects, id, changes))
 
@@ -25,8 +28,8 @@ export default function StepSubjects({ data, update }) {
         A lab is one block of consecutive periods in a lab room (e.g. 2 = a double period). Lab sessions is how many
         such blocks each lab group gets per week.
       </p>
-      {data.subjects.length === 0 && <EmptyState>No subjects yet.</EmptyState>}
-      {data.subjects.map((s) => (
+      {shown.length === 0 && <EmptyState>No subjects{dept ? ` in ${dept.short}` : ''} yet.</EmptyState>}
+      {shown.map((s) => (
         <div key={s.id} className="grid grid-cols-2 items-end gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]">
           <Field label="Name" value={s.name} onChange={(e) => patch(s.id, { name: e.target.value })} className="col-span-2 sm:col-span-1" />
           <Field label="Code" value={s.code} onChange={(e) => patch(s.id, { code: e.target.value })} />

@@ -3,46 +3,74 @@ import { useCollegeData } from './hooks/useCollegeData.js'
 import { usePrefs } from './hooks/usePrefs.js'
 import PrefsControls from './components/PrefsControls.jsx'
 import Landing from './pages/Landing.jsx'
-import { CalendarDays, CalendarPlus, ClipboardList, LayoutGrid, Settings2, Ticket } from 'lucide-react'
+import { CalendarDays, CalendarPlus, ClipboardList, LayoutGrid, Settings2, Ticket, UserRound } from 'lucide-react'
 import { Button, Tabs } from './components/ui.jsx'
 import ChatWidget from './components/ChatWidget.jsx'
-import AdminWizard from './pages/admin/AdminWizard.jsx'
+import DepartmentBar, { HodDepartmentPicker } from './components/DepartmentBar.jsx'
+import AdminWizard, { generateDepartment } from './pages/admin/AdminWizard.jsx'
 import TimetableViews from './pages/TimetableViews.jsx'
 import FacultyView, { currentFacultyId } from './pages/FacultyView.jsx'
 import StudentView from './pages/StudentView.jsx'
 import BookSpace from './pages/booking/BookSpace.jsx'
 import BookingsList from './pages/booking/BookingsList.jsx'
 import { upcomingBookings } from './booking.js'
+import { ALL, deptById } from './data/departments.js'
 
 const ROLE_KEY = 'ttgen:role'
+const DEPT_KEY = 'ttgen:dept'
+const HOD_KEY = 'ttgen:hodDept'
 const ROLE_LABELS = { admin: 'Administrator', hod: 'HOD / Coordinator', faculty: 'Faculty', student: 'Student' }
 
-function readRole() {
+const readKey = (key, fallback) => {
   try {
-    const role = localStorage.getItem(ROLE_KEY)
-    return ROLE_LABELS[role] ? role : 'landing'
+    return localStorage.getItem(key) ?? fallback
   } catch {
-    return 'landing'
+    return fallback
   }
+}
+const writeKey = (key, value) => {
+  try {
+    if (value == null) localStorage.removeItem(key)
+    else localStorage.setItem(key, value)
+  } catch {
+    // per-viewer conveniences only
+  }
+}
+const readRole = () => {
+  const role = readKey(ROLE_KEY, 'landing')
+  return ROLE_LABELS[role] ? role : 'landing'
 }
 
 export default function App() {
   const college = useCollegeData()
+  const { data } = college
   const [view, setView] = useState(readRole)
   const [prefs, setPrefs] = usePrefs()
+  // One department context for the whole app, remembered across views and reloads.
+  const [dept, setDept] = useState(() => readKey(DEPT_KEY, ''))
+  const [hodDept, setHodDept] = useState(() => readKey(HOD_KEY, ''))
   const prefsControls = <PrefsControls prefs={prefs} setPrefs={setPrefs} />
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(ROLE_KEY, view)
-    } catch {
-      // ignore: role memory is a convenience only
-    }
-  }, [view])
+  useEffect(() => writeKey(ROLE_KEY, view), [view])
+  useEffect(() => writeKey(DEPT_KEY, dept), [dept])
+  useEffect(() => writeKey(HOD_KEY, hodDept || null), [hodDept])
 
   if (view === 'landing') {
-    return <Landing onSelect={setView} hasData={college.data.sections.length > 0} controls={prefsControls} />
+    return <Landing onSelect={setView} hasData={data.sections.length > 0} controls={prefsControls} />
   }
+
+  // Role-based department access: Admin may pick any department or the whole college; HODs are locked to
+  // the department they coordinate (a demo assignment); Faculty and Students pick any single department.
+  const departments = data.departments ?? []
+  const firstDept = departments[0]?.id ?? ALL
+  const validDept = (id) => departments.some((d) => d.id === id)
+  const hodAssigned = validDept(hodDept) ? hodDept : ''
+  const effective =
+    view === 'admin'
+      ? dept === ALL || validDept(dept) ? dept : firstDept
+      : view === 'hod'
+        ? hodAssigned
+        : validDept(dept) ? dept : firstDept
 
   return (
     <div className="min-h-screen">
@@ -55,6 +83,7 @@ export default function App() {
             <span className="text-lg font-bold">Smart TimeTables</span>
             <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-sm font-medium text-indigo-700">
               {ROLE_LABELS[view]}
+              {effective && effective !== ALL && departments.length > 0 && ` · ${deptById(data, effective)?.short}`}
             </span>
           </button>
           <div className="flex items-center gap-2">
@@ -66,12 +95,27 @@ export default function App() {
         </div>
       </header>
       <main className="w-full px-4 pb-28 pt-6 sm:px-6 lg:px-8 print:p-0">
-        {view === 'admin' && <AdminPage college={college} />}
-        {view === 'hod' && <HodPage college={college} />}
-        {view === 'faculty' && <FacultyPage college={college} />}
-        {view === 'student' && <StudentView data={college.data} />}
+        {view === 'hod' && departments.length > 0 && !hodAssigned ? (
+          <HodDepartmentPicker data={data} onPick={setHodDept} />
+        ) : (
+          <>
+            <DepartmentBar
+              data={data}
+              value={effective}
+              onChange={setDept}
+              allowAll={view === 'admin'}
+              locked={view === 'hod'}
+              onUnlock={() => setHodDept('')}
+            />
+            
+            {view === 'admin' && <AdminPage college={college} deptId={effective} />}
+            {view === 'hod' && <HodPage college={college} deptId={effective} />}
+            {view === 'faculty' && <FacultyPage college={college} deptId={effective} />}
+            {view === 'student' && <StudentView data={data} deptId={effective} />}
+          </>
+        )}
       </main>
-      <ChatWidget data={college.data} />
+      <ChatWidget data={data} deptId={effective} />
     </div>
   )
 }
@@ -79,11 +123,19 @@ export default function App() {
 const BOOK_TAB = { id: 'book', label: 'Book a space', Icon: CalendarPlus }
 
 /** Booking tabs shared by every role that can book rooms. */
-function BookingTabs({ tab, setTab, college, organizer, createdBy, mine, listTitle, canCancel }) {
+function BookingTabs({ tab, setTab, college, deptId, organizer, createdBy, mine, listTitle, canCancel }) {
   const all = college.data.bookings ?? []
   const shown = mine ? all.filter(mine) : all
   if (tab === 'book') {
-    return <BookSpace college={college} organizer={organizer} createdBy={createdBy} onViewBookings={() => setTab('bookings')} />
+    return (
+      <BookSpace
+        college={college}
+        deptId={deptId === ALL ? undefined : deptId}
+        organizer={organizer}
+        createdBy={createdBy}
+        onViewBookings={() => setTab('bookings')}
+      />
+    )
   }
   if (tab === 'bookings') {
     return (
@@ -100,9 +152,18 @@ function BookingTabs({ tab, setTab, college, organizer, createdBy, mine, listTit
   return null
 }
 
-function AdminPage({ college }) {
+/** Bookings made for a department (falls back to its short name for bookings made before departments). */
+const bookingInDept = (data, deptId) => (b) =>
+  deptId === ALL || b.deptId === deptId || (!b.deptId && b.department === deptById(data, deptId)?.short)
+
+function AdminPage({ college, deptId }) {
   const [tab, setTab] = useState(college.data.timetable ? 'timetable' : 'setup')
   const upcoming = upcomingBookings(college.data.bookings ?? []).length
+  const generateHere = () => {
+    const r = generateDepartment(college.data, deptId)
+    if (r.timetable) college.setTimetable(r.timetable)
+    else setTab('setup')
+  }
   return (
     <div className="space-y-5">
       <Tabs
@@ -115,12 +176,22 @@ function AdminPage({ college }) {
           { id: 'bookings', label: 'All bookings', Icon: Ticket, badge: upcoming },
         ]}
       />
-      {tab === 'setup' && <AdminWizard college={college} onGenerated={() => setTab('timetable')} />}
-      {tab === 'timetable' && <TimetableViews data={college.data} />}
+      {tab === 'setup' && <AdminWizard college={college} deptId={deptId} onGenerated={() => setTab('timetable')} />}
+      {tab === 'timetable' && (
+        <TimetableViews
+          data={college.data}
+          deptId={deptId}
+          canManage
+          onSetup={() => setTab('setup')}
+          onGenerate={deptId === ALL ? () => setTab('setup') : generateHere}
+        />
+      )}
       <BookingTabs
         tab={tab}
         setTab={setTab}
         college={college}
+        deptId={deptId}
+        key={deptId}
         createdBy={{ role: 'admin' }}
         listTitle="All bookings"
         canCancel={() => true}
@@ -129,9 +200,11 @@ function AdminPage({ college }) {
   )
 }
 
-function HodPage({ college }) {
+function HodPage({ college, deptId }) {
   const [tab, setTab] = useState('timetables')
-  const upcoming = upcomingBookings(college.data.bookings ?? []).length
+  const inDept = bookingInDept(college.data, deptId)
+  const upcoming = upcomingBookings((college.data.bookings ?? []).filter(inDept)).length
+  const short = deptById(college.data, deptId)?.short ?? ''
   return (
     <div className="space-y-5">
       <Tabs
@@ -140,27 +213,30 @@ function HodPage({ college }) {
         tabs={[
           { id: 'timetables', label: 'Timetables', Icon: ClipboardList },
           BOOK_TAB,
-          { id: 'bookings', label: 'All bookings', Icon: Ticket, badge: upcoming },
+          { id: 'bookings', label: `${short} bookings`, Icon: Ticket, badge: upcoming },
         ]}
       />
-      {tab === 'timetables' && <TimetableViews data={college.data} withDepartmentFilter />}
-      {/* Coordinators can see and cancel every booking. */}
+      {tab === 'timetables' && <TimetableViews data={college.data} deptId={deptId} />}
+      {/* Coordinators see and cancel their department's bookings. */}
       <BookingTabs
         tab={tab}
         setTab={setTab}
         college={college}
-        createdBy={{ role: 'hod' }}
-        listTitle="All bookings"
+        deptId={deptId}
+        key={deptId}
+        createdBy={{ role: 'hod', deptId }}
+        mine={inDept}
+        listTitle={`${short} bookings`}
         canCancel={() => true}
       />
     </div>
   )
 }
 
-function FacultyPage({ college }) {
+function FacultyPage({ college, deptId }) {
   const [tab, setTab] = useState('timetable')
   // The faculty member picked on the "My timetable" tab is "you" for booking.
-  const teacherId = currentFacultyId(college.data)
+  const teacherId = currentFacultyId(college.data, deptId)
   const teacher = college.data.teachers.find((t) => t.id === teacherId)
   const isMine = (b) => b.organizerId === teacherId || b.createdBy?.teacherId === teacherId
   const upcoming = upcomingBookings((college.data.bookings ?? []).filter(isMine)).length
@@ -170,17 +246,20 @@ function FacultyPage({ college }) {
         value={tab}
         onChange={setTab}
         tabs={[
-          { id: 'timetable', label: 'My timetable', Icon: LayoutGrid },
+          { id: 'timetable', label: 'My timetable', Icon: UserRound },
+          { id: 'department', label: 'Department timetable', Icon: LayoutGrid },
           BOOK_TAB,
           { id: 'bookings', label: 'My bookings', Icon: Ticket, badge: upcoming },
         ]}
       />
-      {tab === 'timetable' && <FacultyView data={college.data} />}
+      {tab === 'timetable' && <FacultyView data={college.data} deptId={deptId} />}
+      {tab === 'department' && <TimetableViews data={college.data} deptId={deptId} showSummary={false} />}
       <BookingTabs
-        key={teacherId}
+        key={`${teacherId}:${deptId}`}
         tab={tab}
         setTab={setTab}
         college={college}
+        deptId={deptId}
         organizer={teacher}
         createdBy={{ role: 'faculty', teacherId }}
         mine={isMine}

@@ -36,11 +36,15 @@ src/
     schema.js                    # emptyCollege(), uid(), periodTimes(), data-shape docs
     demoCollege.js               # sample college (3 depts, 6 sections, 12 teachers, 8 rooms)
     gndecCse.js                  # real GNDEC Ludhiana CSE data (Jul-Dec 2026, 12 sections, lab groups A1/A2)
+    gndecCollege.js              # GNDEC demo: real CSE + SAMPLE ECE/ME/Civil (+ EE not set up), shared rooms/teachers
+    departments.js               # normalizeCollege, sectionsOf/teachersOf/subjectsOf/entriesOf, mergeDepartmentTimetable
+  departments.test.js            # department scoping + cross-department generation
   hooks/useCollegeData.js        # localStorage-backed state (key `ttgen:v1`)
   hooks/usePrefs.js              # theme (light/dark/system) (key `ttgen:prefs`)
   theme-dark.css                 # GENERATED: dark theme flips Tailwind colour scales under `.dark`
   components/                    # TimetableGrid (days across, times down, legend), TimetableSheet (title + Print),
-                                 # SummaryPanel, PrefsControls, ChatWidget, ui bits
+                                 # SummaryPanel, PrefsControls, ChatWidget, DepartmentBar (+ HOD picker),
+                                 # DepartmentEmpty ("set up / generate this department" prompt), ui bits
   pages/
     Landing.jsx                  # role selector
     admin/                       # setup wizard: Time → Rooms → Subjects → Teachers → Sections
@@ -54,6 +58,7 @@ src/
 ```js
 {
   meta: null | { name, note },                                   // where the data came from
+  departments: [{ id, short, name, source?: "gndec" | "sample", note? }],
   time: { days: ["Mon", ...], periodsPerDay: 7, breakAfter: 4,    // break between P4 and P5
           startTime: "08:30", periodMinutes: 60, breakMinutes: 60 },
   rooms:    [{ id, name, capacity, type: "classroom" | "lab" | "seminar" }],
@@ -68,6 +73,11 @@ src/
 }
 ```
 Rooms may have `facilities: string[]` and `eventsOnly: true` (never used for classes, only bookings).
+
+Departments: sections have `deptId` and `batch` (e.g. "3rd Sem (D2)"; the old free-text `department` is kept for
+display); teachers/subjects/rooms have an optional `deptId` (home department; null = service department / shared).
+`normalizeCollege` upgrades older saved data on every load. Rooms are always college-wide.
+`timetable.byDept[deptId]` holds each department's last run (stats, reason, unplaced).
 Timetable entry: `{ sectionId, subjectId, teacherId, roomId, day, period, length, kind: "lecture" | "lab", group?, groupIndex? }`. `day` is a 0-based index, `period` is 0-based internally.
 
 Lab groups: a section with `labGroups: 2` takes each lab as two group units (e.g. A1, A2), each needing a lab
@@ -84,6 +94,11 @@ blocks only its own group, so groups can be in different labs at the same time.
 6. Step limit + random restarts + time budget (`timeLimitMs`, default 4000); on failure returns a plain-language `reason`.
    Identical units (same section/subject/kind) share a `group` and are placed in order to avoid symmetric thrashing.
 7. `findClashes(entries, data)` is an independent verifier used by the UI and the test.
+8. Departments: `generateTimetable(data, { departmentId, fixedEntries })` schedules one department's sections around
+   other departments' existing classes (their rooms and teachers are pre-marked busy); `generateCollege` runs every
+   department in turn, largest first. Units prefer their department's rooms, then shared rooms, then others'.
+   `precheck(..., { departmentId, fixedEntries })` counts shared teachers' hours in other departments.
+   Quality across departments is `collegeQuality` (department scores weighted by classes).
 
 ## Conventions
 - `scheduler.js` must stay framework-free (no React imports) and deterministic for a given `seed` option.
@@ -101,6 +116,10 @@ blocks only its own group, so groups can be in different labs at the same time.
 - Book a Space: bookings change only through `bookSpace` / `cancelBooking` / `addSampleBookings` in
   `useCollegeData`, which re-read the saved bookings, re-check the room and write immediately. The autosave
   effect always keeps the saved bookings (never the in-memory copy), and a `storage` listener syncs other tabs.
-  Roles: Faculty books as themselves and cancels their own; HOD and Admin see and cancel all; no approvals.
+  Roles: Faculty books as themselves and cancels their own; HOD sees/cancels their department's; Admin all.
+- Department context (App.jsx, `ttgen:dept`): Admin picks any department or "All departments"; HOD is locked to a
+  demo assignment (`ttgen:hodDept`, chosen once, "Change" to re-pick); Faculty and Student pick any single
+  department. Pages receive `deptId` and filter with the helpers in `data/departments.js`; never duplicate pages
+  per department.
 - Build in small steps; commit after each working step. Run `npm test` and `npm run build` before committing.
 - `.claude/launch.json` defines the `dev` preview server (port 5173).

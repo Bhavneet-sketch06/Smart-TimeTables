@@ -223,6 +223,7 @@ export function createBooking(req, room, createdBy) {
     eventType: req.eventType,
     title: req.title.trim(),
     department: req.department,
+    deptId: req.deptId || undefined,
     organizerId: req.organizerId || undefined,
     organizerName: req.organizerName.trim(),
     attendance: Number(req.attendance),
@@ -263,7 +264,7 @@ export function seedBookings(data, today = new Date()) {
     room &&
     teacher && {
       ...createBooking(
-        { ...fields, date, organizerId: teacher.id, organizerName: teacher.name, department: teacher.department, setup: 15, cleanup: 15 },
+        { ...fields, date, organizerId: teacher.id, organizerName: teacher.name, department: teacher.department, deptId: teacher.deptId, setup: 15, cleanup: 15 },
         room,
         { role: 'faculty', teacherId: teacher.id },
       ),

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MessageCircle, RotateCcw, SendHorizontal, Sparkles, X } from 'lucide-react'
 import { buildTimetableContext } from '../chat/timetableContext.js'
+import { ALL, deptById, sectionsOf, teachersOf } from '../data/departments.js'
 
-function suggestionsFor(data) {
-  const sec = data.sections[0]?.name
-  const teacher = data.teachers[0]?.name
+function suggestionsFor(data, deptId) {
+  const sec = sectionsOf(data, deptId)[0]?.name
+  const teacher = teachersOf(data, deptId)[0]?.name
   const day = data.time.days[2] ?? data.time.days[0]
   return [
     sec && `When is ${sec} free on ${day}?`,
@@ -15,14 +16,22 @@ function suggestionsFor(data) {
 }
 
 /** Floating "Ask AI" assistant that answers questions about the current timetable via /api/chat. */
-export default function ChatWidget({ data }) {
+export default function ChatWidget({ data, deptId = ALL }) {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const listRef = useRef(null)
   const abortRef = useRef(null)
-  const context = useMemo(() => buildTimetableContext(data), [data])
+  const dept = deptId === ALL ? null : deptById(data, deptId)
+  // The whole college is always included (rooms and teachers are shared); the current department is a hint.
+  const context = useMemo(
+    () =>
+      `${buildTimetableContext(data)}\n\nCURRENT VIEW: the user is looking at ${
+        dept ? `the ${dept.name} (${dept.short}) department` : 'all departments'
+      }. Unless they name another department, assume questions are about this one.`,
+    [data, dept],
+  )
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight })
@@ -111,11 +120,11 @@ export default function ChatWidget({ data }) {
         {messages.length === 0 && (
           <div className="space-y-3">
             <p className="text-slate-600">
-              Hi! I can answer questions about {data.meta?.name ?? 'your college'}'s timetable: free slots, who teaches
+              Hi! I can answer questions about {dept ? `${dept.short} at ` : ''}{data.meta?.name ?? 'your college'}'s timetable: free slots, who teaches
               what, room availability and more.
             </p>
             <div className="flex flex-col gap-2">
-              {suggestionsFor(data).map((s) => (
+              {suggestionsFor(data, deptId).map((s) => (
                 <button
                   key={s}
                   onClick={() => send(s)}

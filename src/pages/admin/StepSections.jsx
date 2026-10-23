@@ -1,13 +1,26 @@
 import { uid } from '../../data/schema.js'
+import { ALL, deptById, sectionsOf } from '../../data/departments.js'
 import { Button, EmptyState, Field, Select } from '../../components/ui.jsx'
 import { patchItem, removeItem, toNumber } from './listUtils.js'
 
-export default function StepSections({ data, update }) {
+export default function StepSections({ data, update, deptId = ALL }) {
   const subjectById = new Map(data.subjects.map((s) => [s.id, s]))
+  const dept = deptId === ALL ? null : deptById(data, deptId)
+  const shown = sectionsOf(data, deptId)
+  const newDept = dept ?? data.departments?.[0]
   const add = () =>
     update('sections', (sections) => [
       ...sections,
-      { id: uid('sec'), name: `Section ${sections.length + 1}`, department: '', students: 60, labGroups: 1, assignments: [] },
+      {
+        id: uid('sec'),
+        name: `${newDept?.short ?? 'Section'} ${shown.length + 1}`,
+        department: newDept?.short ?? '',
+        deptId: newDept?.id,
+        batch: '',
+        students: 60,
+        labGroups: 1,
+        assignments: [],
+      },
     ])
   const patch = (id, changes) => update('sections', (sections) => patchItem(sections, id, changes))
 
@@ -21,18 +34,23 @@ export default function StepSections({ data, update }) {
 
   return (
     <div className="space-y-3">
-      {data.sections.length === 0 && <EmptyState>No sections yet.</EmptyState>}
-      {data.sections.map((sec) => {
+      {shown.length === 0 && (
+        <EmptyState>No sections{dept ? ` in ${dept.short}` : ''} yet. Add one to start this department's timetable.</EmptyState>
+      )}
+      {shown.map((sec) => {
         const hours = sec.assignments.reduce((n, a) => {
           const s = subjectById.get(a.subjectId)
           return n + (s ? s.lectureHours + s.labHours * (s.labHours ? s.labSessions || 1 : 0) : 0)
         }, 0)
-        const unused = data.subjects.filter((s) => !sec.assignments.some((a) => a.subjectId === s.id))
+        // The section's own department's subjects plus shared ones (e.g. Mathematics).
+        const unused = data.subjects.filter(
+          (s) => (!s.deptId || s.deptId === sec.deptId) && !sec.assignments.some((a) => a.subjectId === s.id),
+        )
         return (
           <div key={sec.id} className="space-y-3 rounded-lg border border-slate-200 p-3">
             <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
               <Field label="Name" value={sec.name} onChange={(e) => patch(sec.id, { name: e.target.value })} className="col-span-2 sm:col-span-1" />
-              <Field label="Department" value={sec.department} onChange={(e) => patch(sec.id, { department: e.target.value })} />
+              <Field label="Semester / class" value={sec.batch ?? ''} placeholder="e.g. 3rd Sem (D2)" onChange={(e) => patch(sec.id, { batch: e.target.value })} />
               <Field label="Students" type="number" min={1} value={sec.students} onChange={(e) => patch(sec.id, { students: toNumber(e.target.value, 1) })} />
               <Field
                 label="Lab groups"
@@ -46,6 +64,15 @@ export default function StepSections({ data, update }) {
               <Button variant="danger" onClick={() => update('sections', (sections) => removeItem(sections, sec.id))}>
                 Remove
               </Button>
+              {!dept && (
+                <Select
+                  label="Department"
+                  value={sec.deptId ?? ''}
+                  options={(data.departments ?? []).map((d) => ({ value: d.id, label: d.name }))}
+                  onChange={(e) => patch(sec.id, { deptId: e.target.value, department: deptById(data, e.target.value)?.short ?? '' })}
+                  className="col-span-2"
+                />
+              )}
             </div>
             <div className="space-y-2">
               <div className="text-sm font-medium text-slate-600">

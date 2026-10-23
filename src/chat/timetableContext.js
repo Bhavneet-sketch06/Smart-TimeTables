@@ -34,6 +34,14 @@ export function buildTimetableContext(data) {
   lines.push(`Periods: ${periods.map((p, i) => `P${i + 1} ${p.label}`).join('; ')}`)
   if (breakSlot) lines.push(`Break: ${breakSlot.label} (after P${data.time.breakAfter})`)
 
+  if (data.departments?.length) {
+    lines.push('', 'DEPARTMENTS (rooms are shared college-wide; some teachers teach in several departments)')
+    for (const d of data.departments) {
+      const n = data.sections.filter((s) => s.deptId === d.id).length
+      lines.push(`- ${d.short}: ${d.name}; ${n} section${n === 1 ? '' : 's'}${d.source === 'sample' ? ' (sample data)' : ''}`)
+    }
+  }
+
   lines.push('', 'ROOMS')
   for (const r of data.rooms) {
     const extras = [r.facilities?.length ? `facilities: ${r.facilities.join(', ')}` : '', r.eventsOnly ? 'events only, no regular classes' : '']

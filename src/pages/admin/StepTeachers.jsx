@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { slotKey, uid } from '../../data/schema.js'
-import { Button, EmptyState, Field } from '../../components/ui.jsx'
+import { Button, EmptyState, Field, Select } from '../../components/ui.jsx'
+import { ALL, deptById, teachersOf } from '../../data/departments.js'
 import { patchItem, removeItem, toNumber } from './listUtils.js'
 
 function UnavailableGrid({ time, value, onChange }) {
@@ -35,12 +36,15 @@ function UnavailableGrid({ time, value, onChange }) {
   )
 }
 
-export default function StepTeachers({ data, update }) {
+export default function StepTeachers({ data, update, deptId = ALL }) {
   const [open, setOpen] = useState(null)
+  const dept = deptId === ALL ? null : deptById(data, deptId)
+  // The department's own teachers plus anyone teaching in it (e.g. shared Applied Sciences staff).
+  const shown = teachersOf(data, deptId)
   const add = () =>
     update('teachers', (teachers) => [
       ...teachers,
-      { id: uid('t'), name: 'New teacher', department: '', subjectIds: [], maxHours: 16, unavailable: [] },
+      { id: uid('t'), name: 'New teacher', department: dept?.short ?? '', deptId: dept?.id ?? null, subjectIds: [], maxHours: 16, unavailable: [] },
     ])
   const patch = (id, changes) => update('teachers', (teachers) => patchItem(teachers, id, changes))
   const remove = (id) => {
@@ -55,12 +59,22 @@ export default function StepTeachers({ data, update }) {
 
   return (
     <div className="space-y-3">
-      {data.teachers.length === 0 && <EmptyState>No teachers yet.</EmptyState>}
-      {data.teachers.map((t) => (
+      {shown.length === 0 && <EmptyState>No teachers{dept ? ` in ${dept.short}` : ''} yet.</EmptyState>}
+      {shown.map((t) => (
         <div key={t.id} className="space-y-3 rounded-lg border border-slate-200 p-3">
           <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[2fr_1fr_1fr_auto]">
             <Field label="Name" value={t.name} onChange={(e) => patch(t.id, { name: e.target.value })} className="col-span-2 sm:col-span-1" />
-            <Field label="Department" value={t.department} onChange={(e) => patch(t.id, { department: e.target.value })} />
+            <Select
+              label="Home department"
+              value={t.deptId ?? ''}
+              options={[{ value: '', label: t.deptId ? 'Service department' : t.department || 'Service department' }].concat(
+                (data.departments ?? []).map((d) => ({ value: d.id, label: d.short })),
+              )}
+              onChange={(e) => {
+                const home = deptById(data, e.target.value)
+                patch(t.id, home ? { deptId: home.id, department: home.short } : { deptId: null })
+              }}
+            />
             <Field label="Max hours / week" type="number" min={1} value={t.maxHours} onChange={(e) => patch(t.id, { maxHours: toNumber(e.target.value, 1) })} />
             <Button variant="danger" onClick={() => remove(t.id)}>
               Remove
