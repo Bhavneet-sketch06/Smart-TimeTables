@@ -35,6 +35,7 @@ export function emptyCollege() {
     rooms: [],
     teachers: [],
     subjects: [],
+    departments: [],
     sections: [],
     timetable: null,
     bookings: [],
@@ -80,7 +81,9 @@ export function slotKey(dayName, periodIndex) {
   return `${dayName}-${periodIndex + 1}`
 }
 
+/** Department short names (falls back to the free-text labels of older data). */
 export function departmentsOf(data) {
+  if (data.departments?.length) return data.departments.map((d) => d.short)
   const set = new Set([
     ...data.sections.map((s) => s.department),
     ...data.teachers.map((t) => t.department),

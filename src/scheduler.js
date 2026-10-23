@@ -1,7 +1,9 @@
 // Timetable scheduler: pure JS, no framework imports.
 //
 // Public API:
-//   precheck(data)                     -> { ok, problems: string[] }
+//   precheck(data, { departmentId?, fixedEntries? })   -> { ok, problems: string[] }
+//   generateTimetable(data, { departmentId?, fixedEntries?, seed, ... })  one department (or everything)
+//   generateCollege(data, options)     every department in turn; later ones respect earlier ones' rooms/teachers
 //   generateTimetable(data, options)   -> { ok, entries, unplaced, stats, reason, problems }
 //   findClashes(entries, data)         -> { type, message }[]
 //   scoreQuality(entries, data)        -> { score, repeats, longRuns, gaps }
@@ -82,16 +84,19 @@ function makeContext(data) {
 
 // ---------- pre-check ----------
 
-export function precheck(data) {
+export function precheck(data, { departmentId, fixedEntries = [] } = {}) {
   const problems = []
+  const scope = departmentId ? data.sections.filter((s) => s.deptId === departmentId) : data.sections
   const { days, periodsPerDay: P } = data.time
   if (!days.length || P < 1) {
     return { ok: false, problems: ['Set at least one working day and one period per day.'] }
   }
   const ctx = makeContext(data)
-  const totalUnits = data.sections.reduce((n, s) => n + s.assignments.length, 0)
-  if (!data.sections.length || totalUnits === 0) {
-    problems.push('Add at least one section with subjects assigned.')
+  const totalUnits = scope.reduce((n, s) => n + s.assignments.length, 0)
+  if (!scope.length || totalUnits === 0) {
+    problems.push(
+      departmentId ? 'Add at least one section with subjects to this department.' : 'Add at least one section with subjects assigned.',
+    )
   }
 
   const teacherLoad = new Map()
@@ -99,8 +104,11 @@ export function precheck(data) {
   const labsByLength = new Map()
   let lectureDemand = 0
   let labDemand = 0
+  // Classes other departments already hold count towards shared teachers' loads.
+  for (const e of fixedEntries) addLoad(e.teacherId, e.length)
+  const involved = new Set()
 
-  for (const sec of data.sections) {
+  for (const sec of scope) {
     const groups = labGroupsOf(sec)
     const groupSize = Math.ceil(sec.students / groups)
     let hours = 0
@@ -132,6 +140,7 @@ export function precheck(data) {
       labDemand += lab * sessions * groups
       addLoad(teacher.id, lec)
       addLoad(labTeacher.id, lab * sessions * groups)
+      involved.add(teacher.id).add(labTeacher.id)
       if (lab > 0) labsByLength.set(lab, (labsByLength.get(lab) || 0) + sessions * groups)
 
       if (lab > ctx.longestBlock) {
@@ -153,6 +162,8 @@ export function precheck(data) {
   }
 
   for (const [id, load] of teacherLoad) {
+    // Only teachers who teach in the sections being scheduled (their other departments' hours still count).
+    if (!involved.has(id)) continue
     const t = ctx.teachers.get(id)
     const free = ctx.S - ctx.unavailable.get(id).size
     if (load > t.maxHours) {
@@ -191,9 +202,9 @@ export function precheck(data) {
 
 // ---------- units & candidates ----------
 
-function buildUnits(data, ctx) {
+function buildUnits(sections, ctx) {
   const units = []
-  for (const sec of data.sections) {
+  for (const sec of sections) {
     const groups = labGroupsOf(sec)
     const names = groupNamesOf(sec)
     // Busy-grid keys: a lecture occupies every lab group of the section, a lab only its own group.
@@ -201,7 +212,7 @@ function buildUnits(data, ctx) {
     for (const a of sec.assignments) {
       const sub = ctx.subjects.get(a.subjectId)
       if (!sub || !ctx.teachers.has(a.teacherId)) continue
-      const base = { sectionId: sec.id, subjectId: sub.id }
+      const base = { sectionId: sec.id, subjectId: sub.id, deptId: sec.deptId }
       for (let i = 0; i < (sub.lectureHours || 0); i++) {
         units.push({
           ...base,
@@ -250,7 +261,9 @@ function buildUnits(data, ctx) {
         let free = true
         for (let k = 0; k < u.length; k++) if (blocked.has(s + k)) free = false
         if (!free) continue
-        for (const r of rooms) u.candidates.push({ d, p, s, roomId: r.id, capacity: r.capacity, roomType: r.type })
+        for (const r of rooms) {
+          u.candidates.push({ d, p, s, roomId: r.id, capacity: r.capacity, roomType: r.type, roomDept: r.deptId || null })
+        }
       }
     }
   })
@@ -268,6 +281,19 @@ function makeState(ctx) {
     return row
   }
   return state
+}
+
+/** Classes already fixed elsewhere (other departments) occupy their teachers and rooms. */
+function prefill(state, ctx, fixedEntries) {
+  for (const e of fixedEntries) {
+    const t = state.row(state.teacher, e.teacherId)
+    const room = state.row(state.room, e.roomId)
+    for (let k = 0; k < e.length; k++) {
+      const s = e.day * ctx.P + e.period + k
+      t[s] = 1
+      room[s] = 1
+    }
+  }
 }
 
 function fits(state, u, c) {
@@ -332,13 +358,17 @@ function softScore(state, ctx, u, c) {
   score += c.p * 0.15
   score += (c.capacity - u.students) / 50
   if (c.roomType === 'seminar') score += 1
+  // Prefer the department's own rooms, then shared rooms, then other departments' rooms.
+  if (c.roomDept && u.deptId && c.roomDept !== u.deptId) score += 3
+  else if (!c.roomDept && u.deptId) score += 0.5
   return score
 }
 
 // ---------- search ----------
 
-function attempt(units, ctx, rng, maxSteps, deadline, failCount) {
+function attempt(units, ctx, rng, maxSteps, deadline, failCount, fixedEntries) {
   const state = makeState(ctx)
+  prefill(state, ctx, fixedEntries)
   const placed = new Array(units.length).fill(null)
   let count = 0
   let steps = 0
@@ -424,7 +454,7 @@ function describeUnit(u, ctx) {
 }
 
 // Explain, in plain language, why the hardest unit could not be placed.
-function explainFailure(units, ctx, best, failCount) {
+function explainFailure(units, ctx, best, failCount, fixedEntries) {
   const unplaced = units.filter((u) => !best.placed[u.idx])
   if (!unplaced.length) return ''
   const worst = unplaced.reduce((a, b) => (failCount[b.idx] > failCount[a.idx] ? b : a))
@@ -437,6 +467,7 @@ function explainFailure(units, ctx, best, failCount) {
 
   // Replay the best partial timetable and see what blocks each possible start time.
   const state = makeState(ctx)
+  prefill(state, ctx, fixedEntries)
   units.forEach((u) => best.placed[u.idx] && mark(state, u, best.placed[u.idx], 1))
   const starts = new Map()
   for (const c of worst.candidates) {
@@ -455,7 +486,7 @@ function explainFailure(units, ctx, best, failCount) {
     else if (!cands.some((c) => fits(state, worst, c))) roomsBusy++
   }
   const parts = []
-  if (teacherBusy) parts.push(`${teacherBusy} already have ${teacher.name} teaching`)
+  if (teacherBusy) parts.push(`${teacherBusy} already have ${teacher.name} teaching (in any department)`)
   if (sectionBusy) parts.push(`${sectionBusy} already have another class for ${ctx.sections.get(worst.sectionId).name}`)
   if (roomsBusy) parts.push(`${roomsBusy} have every suitable ${worst.kind === 'lab' ? 'lab' : 'room'} taken`)
   return (
@@ -466,9 +497,9 @@ function explainFailure(units, ctx, best, failCount) {
 }
 
 export function generateTimetable(data, options = {}) {
-  const { seed = Date.now(), maxSteps = 3000, maxRestarts = 25, timeLimitMs = 4000 } = options
+  const { seed = Date.now(), maxSteps = 3000, maxRestarts = 25, timeLimitMs = 4000, departmentId, fixedEntries = [] } = options
   const started = Date.now()
-  const check = precheck(data)
+  const check = precheck(data, { departmentId, fixedEntries })
   if (!check.ok) {
     return {
       ok: false,
@@ -481,7 +512,8 @@ export function generateTimetable(data, options = {}) {
   }
 
   const ctx = makeContext(data)
-  const units = buildUnits(data, ctx)
+  const sections = departmentId ? data.sections.filter((s) => s.deptId === departmentId) : data.sections
+  const units = buildUnits(sections, ctx)
   const rng = mulberry32(seed)
   const failCount = new Array(units.length).fill(0)
   let best = { count: -1 }
@@ -491,7 +523,7 @@ export function generateTimetable(data, options = {}) {
 
   const deadline = started + timeLimitMs
   for (; restarts <= maxRestarts && Date.now() < deadline; restarts++) {
-    const run = attempt(units, ctx, rng, maxSteps, deadline, failCount)
+    const run = attempt(units, ctx, rng, maxSteps, deadline, failCount, fixedEntries)
     totalSteps += run.steps
     if (run.best.count > best.count) best = run.best
     if (run.solved) {
@@ -501,13 +533,14 @@ export function generateTimetable(data, options = {}) {
   }
 
   const entries = toEntries(units, best.placed)
-  const clashes = findClashes(entries, data)
+  // Verified together with the fixed classes, so cross-department clashes would be caught too.
+  const clashes = findClashes([...fixedEntries, ...entries], data)
   return {
     ok: solved && clashes.length === 0,
     entries,
     unplaced: units.filter((u) => !best.placed[u.idx]).map((u) => describeUnit(u, ctx)),
     problems: [],
-    reason: solved ? '' : explainFailure(units, ctx, best, failCount),
+    reason: solved ? '' : explainFailure(units, ctx, best, failCount, fixedEntries),
     stats: {
       placed: best.count,
       total: units.length,
@@ -518,6 +551,68 @@ export function generateTimetable(data, options = {}) {
       ms: Date.now() - started,
     },
   }
+}
+
+/**
+ * Generates every department in turn (largest first). Each department is scheduled around the classes of the
+ * departments before it, so shared rooms and shared teachers are never double-booked across departments.
+ */
+export function generateCollege(data, options = {}) {
+  const started = Date.now()
+  const unitsOf = (deptId) =>
+    data.sections.filter((s) => s.deptId === deptId).reduce((n, s) => n + s.assignments.length, 0)
+  const departments = (data.departments ?? []).filter((d) => unitsOf(d.id) > 0).sort((a, b) => unitsOf(b.id) - unitsOf(a.id))
+  if (!departments.length) return { ...generateTimetable(data, options), byDept: {} }
+
+  let entries = []
+  const byDept = {}
+  for (const d of departments) {
+    const r = generateTimetable(data, { ...options, departmentId: d.id, fixedEntries: entries })
+    byDept[d.id] = { ok: r.ok, stats: r.stats, reason: r.reason, unplaced: r.unplaced, problems: r.problems }
+    entries = [...entries, ...r.entries]
+  }
+  const results = Object.entries(byDept)
+  const short = (id) => departments.find((d) => d.id === id)?.short ?? id
+  const clashes = findClashes(entries, data)
+  const sum = (key) => results.reduce((n, [, r]) => n + r.stats[key], 0)
+  return {
+    ok: results.every(([, r]) => r.ok) && clashes.length === 0,
+    entries,
+    byDept,
+    unplaced: results.flatMap(([id, r]) => r.unplaced.map((u) => `${u} (${short(id)})`)),
+    problems: results.flatMap(([id, r]) => r.problems.map((p) => `${short(id)}: ${p}`)),
+    reason: results
+      .filter(([, r]) => r.reason)
+      .map(([id, r]) => `${short(id)}: ${r.reason}`)
+      .join(' '),
+    stats: {
+      placed: sum('placed'),
+      total: sum('total'),
+      clashes: clashes.length,
+      quality: collegeQuality(entries, data),
+      steps: sum('steps'),
+      restarts: sum('restarts'),
+      ms: Date.now() - started,
+    },
+  }
+}
+
+/**
+ * Quality across several departments: each department's score weighted by its number of classes.
+ * (scoreQuality subtracts raw penalties, so scoring all departments together would understate quality.)
+ */
+export function collegeQuality(entries, data) {
+  const deptOf = new Map(data.sections.map((s) => [s.id, s.deptId ?? '']))
+  const groups = new Map()
+  for (const e of entries) {
+    const key = deptOf.get(e.sectionId) ?? ''
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(e)
+  }
+  if (groups.size <= 1) return scoreQuality(entries, data).score
+  let weighted = 0
+  for (const list of groups.values()) weighted += scoreQuality(list, data).score * list.length
+  return Math.round(weighted / entries.length)
 }
 
 // ---------- verification & quality ----------

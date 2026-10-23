@@ -1,20 +1,27 @@
 import { useEffect, useState } from 'react'
 import { STORAGE_KEY, emptyCollege } from '../data/schema.js'
 import { demoCollege } from '../data/demoCollege.js'
-import { gndecCse } from '../data/gndecCse.js'
+import { gndecCollege } from '../data/gndecCollege.js'
+import { normalizeCollege } from '../data/departments.js'
 import { checkRoom, seedBookings } from '../booking.js'
+
+// Older saved data has no department list: normalizeCollege upgrades it on every load.
+const fromJson = (raw) => normalizeCollege({ ...emptyCollege(), ...JSON.parse(raw) })
 
 function readStored() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return { ...emptyCollege(), ...JSON.parse(raw) }
+    if (raw) return fromJson(raw)
   } catch {
     // corrupted or blocked storage: fall through to a fresh college
   }
   return null
 }
 
-const withDemoBookings = (data) => ({ ...data, bookings: seedBookings(data) })
+const withDemoBookings = (data) => {
+  const college = normalizeCollege(data)
+  return { ...college, bookings: seedBookings(college) }
+}
 
 function write(data) {
   try {
@@ -45,7 +52,7 @@ export function useCollegeData() {
     const onStorage = (e) => {
       if (e.key === STORAGE_KEY && e.newValue) {
         try {
-          setData({ ...emptyCollege(), ...JSON.parse(e.newValue) })
+          setData(fromJson(e.newValue))
         } catch {
           // ignore malformed writes
         }
@@ -99,7 +106,7 @@ export function useCollegeData() {
     cancelBooking,
     addSampleBookings,
     loadDemo: () => replaceAll(withDemoBookings(demoCollege())),
-    loadGndec: () => replaceAll(withDemoBookings(gndecCse())),
+    loadGndec: () => replaceAll(withDemoBookings(gndecCollege())),
     reset: () => replaceAll(emptyCollege()),
   }
 }

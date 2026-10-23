@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Button, Card } from '../../components/ui.jsx'
-import { generateTimetable, precheck } from '../../scheduler.js'
+import { generateCollege, precheck } from '../../scheduler.js'
 import StepTime from './StepTime.jsx'
 import StepRooms from './StepRooms.jsx'
 import StepTeachers from './StepTeachers.jsx'
@@ -30,7 +30,7 @@ export default function AdminWizard({ college, onGenerated }) {
     setBusy(true)
     // Yield to the browser so the "Generating" state paints before the synchronous search.
     setTimeout(() => {
-      const result = generateTimetable(data)
+      const result = generateCollege(data)
       setTimetable({ ...result, generatedAt: new Date().toISOString() })
       setBusy(false)
       onGenerated()

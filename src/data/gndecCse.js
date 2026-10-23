@@ -114,6 +114,17 @@ const ALLOTMENT = {
 }
 
 const DEPARTMENT = { D2: 'CSE - 3rd Sem (D2)', D3: 'CSE - 5th Sem (D3)' }
+const BATCH = { D2: '3rd Sem (D2)', D3: '5th Sem (D3)' }
+
+export const CSE_DEPARTMENT = {
+  id: 'cse',
+  short: 'CSE',
+  name: 'Computer Science & Engineering',
+  source: 'gndec',
+  note: 'From the public CSE subject allotment and timetable on cse.gndec.ac.in.',
+}
+// Home departments of the teachers in the CSE allotment (Applied Sciences is a service department with no sections).
+const TEACHER_DEPT = { CSE: 'cse', MPE: 'me', Civil: 'civil' }
 
 function buildSections() {
   const sections = []
@@ -123,6 +134,8 @@ function buildSections() {
         id: `${year.toLowerCase()}-${letter.toLowerCase()}`,
         name: `${year} CS ${letter}`,
         department: DEPARTMENT[year],
+        deptId: 'cse',
+        batch: BATCH[year],
         students: 56,
         labGroups: 2,
         groupNames: [`${letter}1`, `${letter}2`],
@@ -146,22 +159,23 @@ const ROOMS = [
     name,
     capacity: 75,
     type: 'classroom',
+    deptId: 'cse',
     facilities: ['Projector'],
   })),
-  { id: 'sl1', name: 'Software Lab-I', capacity: 35, type: 'lab', facilities: LAB },
-  { id: 'sl2', name: 'Software Lab-II', capacity: 34, type: 'lab', facilities: LAB },
-  { id: 'sl3', name: 'Software Lab-III', capacity: 35, type: 'lab', facilities: LAB },
-  { id: 'sl4', name: 'Software Lab-IV', capacity: 30, type: 'lab', facilities: LAB },
-  { id: 'pl', name: 'Project Lab', capacity: 35, type: 'lab', facilities: LAB },
-  { id: 'rlab', name: 'Research Lab', capacity: 28, type: 'lab', facilities: LAB },
-  { id: 'oslab', name: 'Operating Systems Lab', capacity: 25, type: 'lab', facilities: LAB },
+  { id: 'sl1', deptId: 'cse', name: 'Software Lab-I', capacity: 35, type: 'lab', facilities: LAB },
+  { id: 'sl2', deptId: 'cse', name: 'Software Lab-II', capacity: 34, type: 'lab', facilities: LAB },
+  { id: 'sl3', deptId: 'cse', name: 'Software Lab-III', capacity: 35, type: 'lab', facilities: LAB },
+  { id: 'sl4', deptId: 'cse', name: 'Software Lab-IV', capacity: 30, type: 'lab', facilities: LAB },
+  { id: 'pl', deptId: 'cse', name: 'Project Lab', capacity: 35, type: 'lab', facilities: LAB },
+  { id: 'rlab', deptId: 'cse', name: 'Research Lab', capacity: 28, type: 'lab', facilities: LAB },
+  { id: 'oslab', deptId: 'cse', name: 'Operating Systems Lab', capacity: 25, type: 'lab', facilities: LAB },
   // DBMS and Hardware lab capacities and equipment are not published; 30 seats is assumed.
-  { id: 'dbmslab', name: 'DBMS Lab', capacity: 30, type: 'lab', facilities: ['Computers'] },
-  { id: 'hwlab', name: 'Hardware Lab', capacity: 30, type: 'lab', facilities: [] },
+  { id: 'dbmslab', deptId: 'cse', name: 'DBMS Lab', capacity: 30, type: 'lab', facilities: ['Computers'] },
+  { id: 'hwlab', deptId: 'cse', name: 'Hardware Lab', capacity: 30, type: 'lab', facilities: [] },
   // Kept for events only (Book a Space), never for regular classes. The hall appears in the published
   // timetable (capacity and equipment assumed); the library's 15 seats and projector are from the infrastructure list.
   { id: 'wshall', name: 'WS Seminar Hall', capacity: 150, type: 'seminar', eventsOnly: true, facilities: ['Projector', 'Sound system', 'Air conditioning'] },
-  { id: 'deptlib', name: 'Departmental Library', capacity: 15, type: 'seminar', eventsOnly: true, facilities: ['Projector'] },
+  { id: 'deptlib', deptId: 'cse', name: 'Departmental Library', capacity: 15, type: 'seminar', eventsOnly: true, facilities: ['Projector'] },
 ]
 
 export function gndecCse() {
@@ -189,9 +203,16 @@ export function gndecCse() {
       periodMinutes: 60,
       breakMinutes: 60,
     },
+    departments: [CSE_DEPARTMENT],
     rooms: ROOMS,
-    teachers: TEACHERS.map((t) => ({ ...t, subjectIds: [...(teaches.get(t.id) || [])], maxHours: 24, unavailable: [] })),
-    subjects: SUBJECTS,
+    teachers: TEACHERS.map((t) => ({
+      ...t,
+      deptId: TEACHER_DEPT[t.department] ?? null,
+      subjectIds: [...(teaches.get(t.id) || [])],
+      maxHours: 24,
+      unavailable: [],
+    })),
+    subjects: SUBJECTS.map((s) => ({ ...s, deptId: s.id === 'am' || s.id === 'ic' || s.id === 'iks' || s.id === 'dmg' ? null : 'cse' })),
     sections,
     timetable: null,
   })
