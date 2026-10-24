@@ -150,15 +150,6 @@ function ProductPreview() {
           ))}
         </div>
       </div>
-      {/* The assistant sits below the preview (never over it). */}
-      <div className="relative ml-auto mt-6 w-fit max-w-xs motion-safe:animate-float">
-        <div className="rounded-2xl rounded-tr-sm border border-slate-200 bg-white px-4 py-3 shadow-xl shadow-indigo-900/10">
-          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-600">
-            <Sparkles className="h-3.5 w-3.5" /> Assistant
-          </p>
-          <p className="mt-1 text-sm text-slate-700">CSE 3A is free on Wednesday, 11:00 – 12:00.</p>
-        </div>
-      </div>
     </div>
   )
 }
@@ -179,9 +170,9 @@ export default function Landing({ onSelect, lastRole, controls }) {
           </a>
           <nav className="hidden items-center gap-8 text-slate-600 md:flex">
             {[
+              ['#roles', 'Roles'],
               ['#features', 'Features'],
               ['#how', 'How it works'],
-              ['#roles', 'Roles'],
             ].map(([href, label]) => (
               <a key={href} href={href} className="group relative py-1 transition hover:text-slate-900">
                 {label}
@@ -189,15 +180,7 @@ export default function Landing({ onSelect, lastRole, controls }) {
               </a>
             ))}
           </nav>
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:block">{controls}</div>
-            <button
-              onClick={() => onSelect(lastRole?.id ?? 'admin')}
-              className="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white transition hover:-translate-y-0.5 hover:bg-slate-700 hover:shadow-lg"
-            >
-              Open app
-            </button>
-          </div>
+          <div>{controls}</div>
         </div>
       </header>
 
@@ -267,8 +250,36 @@ export default function Landing({ onSelect, lastRole, controls }) {
           </div>
         </section>
 
+        {/* Roles */}
+        <section id="roles" className="scroll-mt-16 border-t border-slate-100 bg-slate-50/70 py-20">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <Reveal className="text-center">
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">One app, four views</h2>
+            </Reveal>
+            <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {ROLES.map(({ id, title, icon: Icon, text }, i) => (
+                <Reveal key={id} delay={i * 70}>
+                  <button
+                    onClick={() => onSelect(id)}
+                    className="group flex h-full w-full flex-col items-start rounded-2xl border border-slate-200 bg-white p-7 text-left transition duration-300 hover:-translate-y-1 hover:border-indigo-300 hover:shadow-xl hover:shadow-indigo-900/5"
+                  >
+                    <span className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-100 text-indigo-600 transition duration-300 group-hover:scale-110 group-hover:from-indigo-600 group-hover:to-violet-600 group-hover:text-white">
+                      <Icon className="h-6 w-6" />
+                    </span>
+                    <span className="mt-5 text-xl font-semibold text-slate-900">{title}</span>
+                    <span className="mt-1 text-slate-500">{text}</span>
+                    <span className="mt-6 inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 opacity-70 transition group-hover:opacity-100">
+                      Open <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+                    </span>
+                  </button>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* Features */}
-        <section id="features" className="scroll-mt-16 border-t border-slate-100 bg-slate-50/70 py-20">
+        <section id="features" className="scroll-mt-16 py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <Reveal className="text-center">
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Everything a timetable needs</h2>
@@ -290,7 +301,7 @@ export default function Landing({ onSelect, lastRole, controls }) {
         </section>
 
         {/* How it works */}
-        <section id="how" className="scroll-mt-16 py-20">
+        <section id="how" className="scroll-mt-16 border-y border-slate-100 bg-slate-50/70 py-20">
           <div className="mx-auto max-w-5xl px-4 sm:px-6">
             <Reveal className="text-center">
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Three steps</h2>
@@ -312,34 +323,6 @@ export default function Landing({ onSelect, lastRole, controls }) {
                 </Reveal>
               ))}
             </ol>
-          </div>
-        </section>
-
-        {/* Roles */}
-        <section id="roles" className="scroll-mt-16 border-t border-slate-100 bg-slate-50/70 py-20">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            <Reveal className="text-center">
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">One app, four views</h2>
-            </Reveal>
-            <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {ROLES.map(({ id, title, icon: Icon, text }, i) => (
-                <Reveal key={id} delay={i * 70}>
-                  <button
-                    onClick={() => onSelect(id)}
-                    className="group flex h-full w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left transition duration-300 hover:-translate-y-1 hover:border-indigo-300 hover:shadow-xl hover:shadow-indigo-900/5"
-                  >
-                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-indigo-50 to-violet-100 text-indigo-600 transition duration-300 group-hover:scale-110">
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-semibold text-slate-900">{title}</span>
-                      <span className="block text-sm text-slate-500">{text}</span>
-                    </span>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:translate-x-1 group-hover:text-indigo-600" />
-                  </button>
-                </Reveal>
-              ))}
-            </div>
           </div>
         </section>
 
