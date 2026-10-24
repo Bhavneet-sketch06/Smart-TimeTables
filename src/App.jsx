@@ -44,19 +44,29 @@ const readRole = () => {
 export default function App() {
   const college = useCollegeData()
   const { data } = college
-  const [view, setView] = useState(readRole)
+  // The landing page always opens first; the last role used is offered there as a shortcut.
+  const [view, setView] = useState('landing')
   const [prefs, setPrefs] = usePrefs()
   // One department context for the whole app, remembered across views and reloads.
   const [dept, setDept] = useState(() => readKey(DEPT_KEY, ''))
   const [hodDept, setHodDept] = useState(() => readKey(HOD_KEY, ''))
   const prefsControls = <PrefsControls prefs={prefs} setPrefs={setPrefs} />
 
-  useEffect(() => writeKey(ROLE_KEY, view), [view])
+  useEffect(() => {
+    if (view !== 'landing') writeKey(ROLE_KEY, view)
+  }, [view])
   useEffect(() => writeKey(DEPT_KEY, dept), [dept])
   useEffect(() => writeKey(HOD_KEY, hodDept || null), [hodDept])
 
   if (view === 'landing') {
-    return <Landing onSelect={setView} hasData={data.sections.length > 0} controls={prefsControls} />
+    const lastRole = readRole()
+    return (
+      <Landing
+        onSelect={setView}
+        lastRole={ROLE_LABELS[lastRole] ? { id: lastRole, label: ROLE_LABELS[lastRole] } : null}
+        controls={prefsControls}
+      />
+    )
   }
 
   // Role-based department access: Admin may pick any department or the whole college; HODs are locked to
