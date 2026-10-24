@@ -105,6 +105,8 @@ export function useCollegeData() {
     bookSpace,
     cancelBooking,
     addSampleBookings,
+    /** Saves imported setup data (already validated by buildImport); the saved bookings are kept as they are. */
+    importCollege: (next) => replaceAll({ ...next, timetable: null, bookings: latestBookings() }),
     loadDemo: () => replaceAll(withDemoBookings(demoCollege())),
     loadGndec: () => replaceAll(withDemoBookings(gndecCollege())),
     reset: () => replaceAll(emptyCollege()),

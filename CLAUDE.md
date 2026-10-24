@@ -34,6 +34,10 @@ src/
   scheduler.test.js              # runs scheduler on demo data, asserts zero clashes
   diagnose.js, diagnose.test.js  # PURE JS: failure guidance (causes ranked, suggested changes, pre-check/quick-test checks)
   myDay.js, myDay.test.js        # PURE JS: a student's day (classes in time order, now/next, next teaching day)
+  import/                        # PURE JS: Import College Data (no dependencies, nothing leaves the browser)
+    formats.js                   # CSV parse/write, .xlsx read (zip + DecompressionStream) and minimal .xlsx write
+    tables.js                    # accepted tables/columns (+ synonyms), sample college used for templates and demo
+    collegeImport.js             # readUpload, detectTable/autoMap, buildImport (row-level validation, add/replace)
   data/
     schema.js                    # emptyCollege(), uid(), periodTimes(), data-shape docs
     demoCollege.js               # sample college (3 depts, 6 sections, 12 teachers, 8 rooms)
@@ -50,6 +54,7 @@ src/
   pages/
     Landing.jsx                  # role selector
     admin/                       # setup wizard: Time → Rooms → Subjects → Teachers → Sections
+                                 # ImportData.jsx / ImportReview.jsx: choose files → map → validate → apply
                                  # (subjects before teachers so "can teach" has options); listUtils.js helpers
     TimetableViews.jsx           # section / teacher / room tabs + summary (Admin, HOD)
     FacultyView.jsx, StudentView.jsx  # StudentView switches between MyDay.jsx and the weekly sheet
@@ -118,6 +123,12 @@ blocks only its own group, so groups can be in different labs at the same time.
 - Keep components small and functional; state flows from `useCollegeData` in `App.jsx` via props.
 - Other localStorage keys (`ttgen:role`, `ttgen:student`, `ttgen:studentView`, `ttgen:faculty`) are per-viewer conveniences only; wrap all storage access in try/catch.
 - Editing any input through `update()` clears the stored timetable (it would be stale).
+- Import College Data: one table per CSV file or per .xlsx sheet (time, departments, rooms, subjects, teachers,
+  sections, assignments); records refer to each other by department code, subject code, section and teacher name.
+  `buildImport` never overwrites: "add" reports clashes with the current setup as errors, "replace" needs a confirm
+  and keeps ids of same-named records. Any error blocks the import; the generator's precheck shows as warnings.
+  Saved through `importCollege` in useCollegeData (bookings kept, timetable cleared); imported data has
+  `meta.source: 'import'` and departments `source: 'import'`.
 - Book a Space: bookings change only through `bookSpace` / `cancelBooking` / `addSampleBookings` in
   `useCollegeData`, which re-read the saved bookings, re-check the room and write immediately. The autosave
   effect always keeps the saved bookings (never the in-memory copy), and a `storage` listener syncs other tabs.

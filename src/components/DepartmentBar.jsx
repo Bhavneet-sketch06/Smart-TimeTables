@@ -4,6 +4,9 @@ import { Button, Card, EmptyState } from './ui.jsx'
 
 function SourceBadge({ dept }) {
   if (!dept?.source) return null
+  if (dept.source === 'import') {
+    return <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-800">Imported data</span>
+  }
   return dept.source === 'gndec' ? (
     <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">From GNDEC documents</span>
   ) : (

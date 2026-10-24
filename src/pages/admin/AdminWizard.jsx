@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Building2, CalendarCog } from 'lucide-react'
+import { Building2, CalendarCog, FileUp } from 'lucide-react'
 import { Button, Card } from '../../components/ui.jsx'
 import FailureGuidance from '../../components/FailureGuidance.jsx'
 import { generateCollege, generateTimetable, precheck } from '../../scheduler.js'
@@ -9,6 +9,7 @@ import StepRooms from './StepRooms.jsx'
 import StepTeachers from './StepTeachers.jsx'
 import StepSubjects from './StepSubjects.jsx'
 import StepSections from './StepSections.jsx'
+import ImportData from './ImportData.jsx'
 
 const STEPS = [
   { title: 'Time structure', Component: StepTime, count: (d) => `${d.time.days.length}×${d.time.periodsPerDay}`, shared: true },
@@ -37,6 +38,8 @@ export default function AdminWizard({ college, deptId = ALL, onGenerated, initia
   const [busy, setBusy] = useState('')
   // Departments whose inputs make a timetable impossible: { deptId, run, fixedEntries }.
   const [failures, setFailures] = useState(initialFailures)
+  // Import College Data replaces the wizard until the administrator goes back to manual setup.
+  const [importing, setImporting] = useState(false)
   const { title, Component, shared } = STEPS[step]
   const last = step === STEPS.length - 1
   const dept = deptId === ALL ? null : deptById(data, deptId)
@@ -71,6 +74,16 @@ export default function AdminWizard({ college, deptId = ALL, onGenerated, initia
         .map(([id, r]) => ({ deptId: id, run: r, fixedEntries: fixedFor(data, id, result.entries) }))
     })
 
+  if (importing) {
+    return (
+      <ImportData
+        college={college}
+        onManual={() => (setImporting(false), setStep(0))}
+        onContinue={() => (setImporting(false), setFailures([]), setStep(STEPS.length - 1))}
+      />
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -79,6 +92,9 @@ export default function AdminWizard({ college, deptId = ALL, onGenerated, initia
           {data.meta && <p className="text-slate-500">Loaded: {data.meta.name}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button onClick={() => setImporting(true)}>
+            <FileUp className="h-4 w-4" /> Import college data
+          </Button>
           <Button variant="secondary" onClick={() => { loadGndec(); setFailures([]) }}>
             Load GNDEC demo (CSE + sample departments)
           </Button>
