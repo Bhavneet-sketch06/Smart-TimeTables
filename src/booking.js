@@ -195,7 +195,7 @@ export function suggestAlternatives(data, bookings, req, { limit = 4, now = new 
   // then more same-day options, so suggestions aren't all bunched at one end of the day.
   const slots = [firstFree(later), firstFree(earlier)].filter(Boolean)
   for (let i = 1; i <= 7 && slots.length < limit; i++) {
-    if (weekdayOf(addDays(req.date, i)) === 'Sun') continue // colleges are closed on Sundays
+    if (!data.time.days.includes(weekdayOf(addDays(req.date, i)))) continue // only the college's working days
     const slot = freeAt(addDays(req.date, i), original)
     if (slot) slots.push(slot)
   }

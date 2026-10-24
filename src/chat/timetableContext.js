@@ -1,4 +1,4 @@
-import { periodTimes } from '../data/schema.js'
+import { blockedOf, periodTimes, periodsOn } from '../data/schema.js'
 import { formatDate, timeRange, upcomingBookings } from '../booking.js'
 
 /** Upcoming one-off room bookings (Book a Space), soonest first. */
@@ -25,14 +25,18 @@ export function buildTimetableContext(data) {
   const subjects = byId(data.subjects)
   const teachers = byId(data.teachers)
   const rooms = byId(data.rooms)
-  const { periods, breakSlot } = periodTimes(data.time)
+  const { periods, breaks } = periodTimes(data.time)
   const lines = []
 
   lines.push(`College: ${data.meta?.name ?? 'Custom college data'}`)
   if (data.meta?.note) lines.push(`Note: ${data.meta.note}`)
   lines.push(`Working days: ${data.time.days.join(', ')}`)
   lines.push(`Periods: ${periods.map((p, i) => `P${i + 1} ${p.label}`).join('; ')}`)
-  if (breakSlot) lines.push(`Break: ${breakSlot.label} (after P${data.time.breakAfter})`)
+  for (const b of breaks) lines.push(`Break: ${b.label} (${b.name}, after P${b.after})`)
+  const short = data.time.days.filter((d) => periodsOn(data.time, d) < data.time.periodsPerDay)
+  if (short.length) lines.push(`Shorter days: ${short.map((d) => `${d} ends after P${periodsOn(data.time, d)}`).join('; ')}`)
+  const blocked = Object.entries(blockedOf(data.time))
+  if (blocked.length) lines.push(`No classes (college-wide): ${blocked.map(([slot, why]) => `${slot}${why ? ` ${why}` : ''}`).join('; ')}`)
 
   if (data.departments?.length) {
     lines.push('', 'DEPARTMENTS (rooms are shared college-wide; some teachers teach in several departments)')

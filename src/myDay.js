@@ -17,13 +17,13 @@ const toMinutes = (hhmm) => {
  *   classes: [{ entry, start, end, startMin, endMin, status: 'done' | 'now' | 'next' | 'later' }],
  *   state: 'off' | 'free' | 'finished' | 'active',
  *   highlight,              // the classes on now, or else the next ones (several when lab groups run side by side)
- *   onBreak, breakSlot,     // the break, and whether it is on right now
+ *   breaks, onBreak,        // the day's breaks [{ start, end, name, label }], and the one on right now (or null)
  *   upcoming,               // first class of the next day that has any: { dayName, inDays, first } or null
  * }
  */
 export function planDay(data, entries, now = new Date()) {
   const { days } = data.time
-  const { periods, breakSlot } = periodTimes(data.time)
+  const { periods, breaks } = periodTimes(data.time)
   const minutes = now.getHours() * 60 + now.getMinutes()
   const dayName = WEEKDAYS[now.getDay()]
   const day = days.indexOf(dayName)
@@ -58,10 +58,9 @@ export function planDay(data, entries, now = new Date()) {
     if (d >= 0 && onDay(d).length) upcoming = { dayName: name, inDays: i, first: onDay(d)[0] }
   }
 
-  const onBreak =
-    !!breakSlot && day >= 0 && minutes >= toMinutes(breakSlot.start) && minutes < toMinutes(breakSlot.end)
+  const onBreak = (day >= 0 && breaks.find((b) => minutes >= toMinutes(b.start) && minutes < toMinutes(b.end))) || null
   const state = day < 0 ? 'off' : !classes.length ? 'free' : highlight.length ? 'active' : 'finished'
-  return { dayName, teachingDay: day >= 0, classes, state, highlight, onBreak, breakSlot, upcoming, minutes }
+  return { dayName, teachingDay: day >= 0, classes, state, highlight, onBreak, breaks, upcoming, minutes }
 }
 
 /** "in 5 min", "in 1 h 20 min" */

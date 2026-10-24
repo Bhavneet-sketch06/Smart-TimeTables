@@ -14,7 +14,7 @@
 //   pre-check with the change applied confirmed it. A remedy is never claimed to fix the timetable unless
 //   testChange actually generated one.
 
-import { ALL_DAYS, uid } from './data/schema.js'
+import { ALL_DAYS, DAY_NAMES, blocksPerWeek, breaksOf, longestBlockOf, openPeriodsOf, uid } from './data/schema.js'
 import { generateTimetable, labGroupsOf, labSessionsOf, precheck, roomFits } from './scheduler.js'
 
 const plural = (n, word, many = `${word}s`) => `${n} ${n === 1 ? word : many}`
@@ -22,8 +22,6 @@ const find = (list, id) => list.find((x) => x.id === id)
 const nameOf = (list, id, fallback = 'an unknown item') => find(list, id)?.name ?? fallback
 const list = (names) =>
   names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
-
-const DAY_NAMES = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday' }
 
 const WHERE = {
   time: 'Setup → Time structure',
@@ -96,7 +94,7 @@ function teacherLoads(data) {
   return loads
 }
 
-const freePeriods = (data, teacher) => data.time.days.length * data.time.periodsPerDay - (teacher.unavailable?.length || 0)
+const freePeriods = (data, teacher) => openPeriodsOf(data.time) - (teacher.unavailable?.length || 0)
 
 /**
  * Other teachers who can take over a section's lectures or lab for a subject, with room under their maximum.
@@ -202,9 +200,24 @@ function timeRemedies(data, { periodsNeeded = 1 } = {}) {
   return out
 }
 
-/** How many whole lab blocks of `len` periods fit in one day, given where the break is. */
-const blocksPerDay = (P, breakAfter, len) =>
-  (breakAfter > 0 && breakAfter < P ? [breakAfter, P - breakAfter] : [P]).reduce((n, h) => n + Math.floor(h / len), 0)
+/**
+ * The single break move (one break to another position) that most improves `score(time)`, e.g. more lab blocks a
+ * week. Returns { change, label, from, to, value } or null when no move helps.
+ */
+function bestBreakMove(time, score) {
+  const breaks = breaksOf(time)
+  const now = score(time)
+  let best = null
+  breaks.forEach((b, i) => {
+    for (let to = 1; to < time.periodsPerDay; to++) {
+      if (breaks.some((x) => x.after === to)) continue
+      const next = breaks.map((x, j) => (j === i ? { ...x, after: to } : x))
+      const value = score({ ...time, breaks: next })
+      if (value > now && (!best || value > best.value)) best = { change: { type: 'time', patch: { breaks: next } }, label: b.label, from: b.after, to, value }
+    }
+  })
+  return best
+}
 
 // ---------- pre-check issues (confirmed causes) ----------
 
@@ -240,7 +253,7 @@ function issueDiagnosis(data, issue, departmentId) {
   const sub = find(data.subjects, issue.subjectId)
   const teacher = find(data.teachers, issue.teacherId)
   const d = { id: issue.key, certainty: 'confirmed', title: '', cause: issue.message, facts: [], remedies: [] }
-  const S = data.time.days.length * data.time.periodsPerDay
+  const S = openPeriodsOf(data.time)
 
   switch (issue.kind) {
     case 'time':
@@ -292,7 +305,7 @@ function issueDiagnosis(data, issue, departmentId) {
       const sessions = labSessionsOf(sub)
       const newSessions = Math.ceil((labHours * sessions) / longestBlock)
       d.title = `${sub?.name} lab is longer than any stretch between breaks`
-      d.facts.push(`Lab blocks can't run across the break, and the longest stretch is ${plural(longestBlock, 'period')}.`)
+      d.facts.push(`Lab blocks can't run across a break or a no-class slot, and the longest stretch is ${plural(longestBlock, 'period')}.`)
       d.remedies.push({
         id: `shorten-${sub?.id}`,
         text: `Split the ${labHours}-period lab into ${plural(newSessions, 'session')} of ${longestBlock} periods a week.`,
@@ -300,14 +313,15 @@ function issueDiagnosis(data, issue, departmentId) {
         change: sub && { type: 'subject', id: sub.id, patch: { labHours: longestBlock, labSessions: newSessions } },
       })
       const P = data.time.periodsPerDay
-      if (labHours < P) {
+      const move = bestBreakMove(data.time, (t) => Math.min(longestBlockOf(t), labHours))
+      if (move) {
         d.remedies.push({
-          id: `break-${labHours}`,
-          text: `Move the break to after period ${labHours}, so the morning is long enough (changes the day for every department).`,
+          id: `break-${move.from}-${move.to}`,
+          text: `Move the ${move.label.toLowerCase()} from after period ${move.from} to after period ${move.to}, so a ${labHours}-period stretch fits (changes the day for every department).`,
           where: WHERE.time,
-          change: { type: 'time', patch: { breakAfter: labHours } },
+          change: move.change,
         })
-      } else {
+      } else if (labHours >= P) {
         d.remedies.push(...timeRemedies(data, { periodsNeeded: (labHours - P + 1) * data.time.days.length }).slice(0, 1))
       }
       break
@@ -391,27 +405,20 @@ function issueDiagnosis(data, issue, departmentId) {
     }
     case 'lab-blocks': {
       const len = Number(issue.block)
-      const { days, periodsPerDay: P, breakAfter } = data.time
-      const perLabWeek = days.length * issue.perDay
-      const extra = Math.ceil((issue.needed - issue.capacity) / Math.max(1, perLabWeek))
+      const extra = Math.ceil((issue.needed - issue.capacity) / Math.max(1, issue.perWeek))
       d.title = `Not enough ${len}-period lab slots`
       d.facts.push(
-        `${issue.needed} lab sessions of ${len} periods need a slot; ${plural(issue.rooms, 'lab')} × ${days.length} days × ${issue.perDay} per day = ${issue.capacity}.`,
+        `${issue.needed} lab sessions of ${len} periods need a slot; ${plural(issue.rooms, 'lab')} × ${issue.perWeek} blocks a week each = ${issue.capacity}.`,
       )
       d.remedies.push(...roomRemedies(data, 'lab', labRoomSize(data, departmentId), departmentId, { count: extra }))
-      // A different break position may fit more whole blocks per day.
-      let bestBreak = null
-      for (let b = 1; b < P; b++) {
-        if (b === breakAfter) continue
-        const per = blocksPerDay(P, b, len)
-        if (per > issue.perDay && (!bestBreak || per > bestBreak.per)) bestBreak = { b, per }
-      }
-      if (bestBreak) {
+      // A different break position may fit more whole blocks a week.
+      const move = bestBreakMove(data.time, (t) => blocksPerWeek(t, len))
+      if (move) {
         d.remedies.push({
-          id: `break-${bestBreak.b}`,
-          text: `Move the break to after period ${bestBreak.b}: each lab then fits ${bestBreak.per} blocks a day instead of ${issue.perDay} (changes the day for every department).`,
+          id: `break-${move.from}-${move.to}`,
+          text: `Move the ${move.label.toLowerCase()} from after period ${move.from} to after period ${move.to}: each lab then fits ${move.value} blocks a week instead of ${issue.perWeek} (changes the day for every department).`,
           where: WHERE.time,
-          change: { type: 'time', patch: { breakAfter: bestBreak.b } },
+          change: move.change,
         })
       }
       d.remedies.push(...timeRemedies(data).slice(1))
@@ -473,7 +480,7 @@ function searchDiagnosis(data, run, departmentId, fixedEntries) {
   const who = `${sec.name}${u.group ? ` (group ${u.group})` : ''}`
   const what = `${sub.name}${lab ? ' lab' : ''} for ${who}`
   const { days, periodsPerDay: P } = data.time
-  const S = days.length * P
+  const S = openPeriodsOf(data.time)
 
   const blockers = [
     { key: 'teacher', n: f.teacherBusy, text: `${teacher.name} was already teaching` },

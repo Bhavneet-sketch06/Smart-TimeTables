@@ -9,6 +9,9 @@
 //   scoreQuality(entries, data)        -> { score, repeats, longRuns, gaps }
 //
 // Internally days and periods are 0-based indices; a "slot" is day * periodsPerDay + period.
+// "Closed" slots (after a short day ends, or blocked college-wide) never hold classes; blocks never cross a break.
+
+import { blocksPerWeek, breaksOf, isClosed, longestBlockOf, segmentsOf } from './data/schema.js'
 
 const LECTURE_ROOM_TYPES = new Set(['classroom', 'seminar'])
 const MAX_TEACHER_RUN = 3 // more back-to-back periods than this is penalised
@@ -44,13 +47,16 @@ export function roomFits(room, kind, students) {
 }
 
 function makeContext(data) {
-  const { days, periodsPerDay: P, breakAfter = 0 } = data.time
+  const { days, periodsPerDay: P } = data.time
   const D = days.length
-  const hasBreak = breakAfter > 0 && breakAfter < P
-  // A block may not run past the end of the day or across the break.
-  const blockOk = (p, len) => p + len <= P && !(hasBreak && p < breakAfter && p + len > breakAfter)
-  const segment = (p) => (hasBreak ? (p < breakAfter ? [0, breakAfter] : [breakAfter, P]) : [0, P])
-  const longestBlock = hasBreak ? Math.max(breakAfter, P - breakAfter) : P
+  const segments = segmentsOf(data.time)
+  const segment = (p) => segments.find(([from, to]) => p >= from && p < to) ?? [0, P]
+  // A block may not run past the end of the day or across a break.
+  const blockOk = (p, len) => p + len <= segment(p)[1]
+  const closed = new Set()
+  days.forEach((day, d) => {
+    for (let p = 0; p < P; p++) if (isClosed(data.time, day, p)) closed.add(d * P + p)
+  })
 
   const unavailable = new Map()
   for (const t of data.teachers) {
@@ -59,7 +65,7 @@ function makeContext(data) {
       const cut = key.lastIndexOf('-')
       const d = days.indexOf(key.slice(0, cut))
       const p = Number(key.slice(cut + 1)) - 1
-      if (d >= 0 && p >= 0 && p < P) set.add(d * P + p)
+      if (d >= 0 && p >= 0 && p < P && !closed.has(d * P + p)) set.add(d * P + p)
     }
     unavailable.set(t.id, set)
   }
@@ -69,11 +75,14 @@ function makeContext(data) {
     D,
     P,
     S: D * P,
-    breakAfter,
-    hasBreak,
+    open: D * P - closed.size, // slots that can hold classes
+    closed,
+    breaks: breaksOf(data.time),
     blockOk,
     segment,
-    longestBlock,
+    segments,
+    blocksPerWeek: (len) => blocksPerWeek(data.time, len),
+    longestBlock: longestBlockOf(data.time),
     unavailable,
     rooms: byId(data.rooms),
     teachers: byId(data.teachers),
@@ -173,11 +182,11 @@ export function precheck(data, { departmentId, fixedEntries = [] } = {}) {
         })
       }
     }
-    if (hours > ctx.S) {
-      report('week-overflow', `${sec.name} needs ${hours} periods a week, but the week only has ${ctx.S} periods.`, {
+    if (hours > ctx.open) {
+      report('week-overflow', `${sec.name} needs ${hours} periods a week, but the week only has ${ctx.open} teaching periods.`, {
         sectionId: sec.id,
         hours,
-        slots: ctx.S,
+        slots: ctx.open,
       })
     }
     if (hours > 0 && !data.rooms.some((r) => roomFits(r, 'lecture', sec.students))) {
@@ -192,7 +201,7 @@ export function precheck(data, { departmentId, fixedEntries = [] } = {}) {
     // Only teachers who teach in the sections being scheduled (their other departments' hours still count).
     if (!involved.has(id)) continue
     const t = ctx.teachers.get(id)
-    const free = ctx.S - ctx.unavailable.get(id).size
+    const free = ctx.open - ctx.unavailable.get(id).size
     if (load > t.maxHours) {
       report('teacher-max', `${t.name} is assigned ${load} hours a week, more than their maximum of ${t.maxHours}.`, {
         teacherId: id,
@@ -211,31 +220,30 @@ export function precheck(data, { departmentId, fixedEntries = [] } = {}) {
 
   const lectureRooms = data.rooms.filter((r) => !r.eventsOnly && LECTURE_ROOM_TYPES.has(r.type)).length
   const labRooms = data.rooms.filter((r) => !r.eventsOnly && r.type === 'lab').length
-  if (lectureDemand > lectureRooms * ctx.S) {
+  if (lectureDemand > lectureRooms * ctx.open) {
     report(
       'lecture-rooms',
-      `Sections need ${lectureDemand} lecture periods, but ${lectureRooms} classroom(s) only offer ${lectureRooms * ctx.S}.`,
-      { demand: lectureDemand, rooms: lectureRooms, offered: lectureRooms * ctx.S },
+      `Sections need ${lectureDemand} lecture periods, but ${lectureRooms} classroom(s) only offer ${lectureRooms * ctx.open}.`,
+      { demand: lectureDemand, rooms: lectureRooms, offered: lectureRooms * ctx.open },
     )
   }
-  if (labDemand > labRooms * ctx.S) {
-    report('lab-rooms', `Sections need ${labDemand} lab periods, but ${labRooms} lab(s) only offer ${labRooms * ctx.S}.`, {
+  if (labDemand > labRooms * ctx.open) {
+    report('lab-rooms', `Sections need ${labDemand} lab periods, but ${labRooms} lab(s) only offer ${labRooms * ctx.open}.`, {
       demand: labDemand,
       rooms: labRooms,
-      offered: labRooms * ctx.S,
+      offered: labRooms * ctx.open,
     })
   }
 
-  // Lab blocks can't straddle the break, so count how many whole blocks fit in a week.
-  const halves = ctx.hasBreak ? [ctx.breakAfter, P - ctx.breakAfter] : [P]
+  // Lab blocks can't straddle a break or a closed slot, so count how many whole blocks fit in a week.
   for (const [len, needed] of labsByLength) {
-    const perDay = halves.reduce((n, h) => n + Math.floor(h / len), 0)
-    const capacity = labRooms * ctx.D * perDay
-    if (labRooms && perDay && needed > capacity) {
+    const perWeek = ctx.blocksPerWeek(len)
+    const capacity = labRooms * perWeek
+    if (labRooms && perWeek && needed > capacity) {
       report(
         'lab-blocks',
-        `There are ${needed} ${len}-period lab sessions to schedule, but ${labRooms} lab room(s) can only hold ${capacity} per week (${perDay} per lab per day around the break).`,
-        { block: String(len), needed, capacity, rooms: labRooms, perDay },
+        `There are ${needed} ${len}-period lab sessions to schedule, but ${labRooms} lab room(s) can only hold ${capacity} per week (${perWeek} per lab, around the breaks).`,
+        { block: String(len), needed, capacity, rooms: labRooms, perWeek },
       )
     }
   }
@@ -302,7 +310,7 @@ function buildUnits(sections, ctx) {
         if (!ctx.blockOk(p, u.length)) continue
         const s = d * ctx.P + p
         let free = true
-        for (let k = 0; k < u.length; k++) if (blocked.has(s + k)) free = false
+        for (let k = 0; k < u.length; k++) if (blocked.has(s + k) || ctx.closed.has(s + k)) free = false
         if (!free) continue
         for (const r of rooms) {
           u.candidates.push({ d, p, s, roomId: r.id, capacity: r.capacity, roomType: r.type, roomDept: r.deptId || null })
@@ -716,7 +724,7 @@ export function findClashes(entries, data) {
     const room = ctx.rooms.get(e.roomId)
     const sec = ctx.sections.get(e.sectionId)
     if (!ctx.blockOk(e.period, e.length)) {
-      clashes.push({ type: 'block', message: `${name(ctx.subjects, e.subjectId)} lab at ${where} runs past the break or day end.` })
+      clashes.push({ type: 'block', message: `${name(ctx.subjects, e.subjectId)} ${e.kind} at ${where} runs across a break or past the day end.` })
     }
     const groups = sec ? labGroupsOf(sec) : 1
     const students = sec ? (e.groupIndex != null ? Math.ceil(sec.students / groups) : sec.students) : 0
@@ -728,6 +736,9 @@ export function findClashes(entries, data) {
     for (let k = 0; k < e.length; k++) {
       const s = e.day * ctx.P + e.period + k
       const at = `${ctx.days[e.day]} P${e.period + k + 1}`
+      if (ctx.closed.has(s)) {
+        clashes.push({ type: 'closed', message: `${name(ctx.subjects, e.subjectId)} is at ${at}, when there are no classes.` })
+      }
       if (ctx.unavailable.get(e.teacherId)?.has(s)) {
         clashes.push({ type: 'unavailable', message: `${name(ctx.teachers, e.teacherId)} is unavailable at ${at}.` })
       }
@@ -773,11 +784,10 @@ export function scoreQuality(entries, data) {
   let repeats = 0
   for (const n of daySubject.values()) repeats += Math.max(0, n - 1)
 
-  const halves = ctx.hasBreak ? [[0, ctx.breakAfter], [ctx.breakAfter, ctx.P]] : [[0, ctx.P]]
   let longRuns = 0
   for (const r of teacherRows.values()) {
     for (let d = 0; d < ctx.D; d++) {
-      for (const [lo, hi] of halves) {
+      for (const [lo, hi] of ctx.segments) {
         let run = 0
         for (let p = lo; p < hi; p++) {
           run = r[d * ctx.P + p] ? run + 1 : 0

@@ -150,3 +150,43 @@ describe('pre-check and failure reasons', () => {
     expect(clashes[0].type).toBe('teacher')
   })
 })
+
+describe('flexible week and day', () => {
+  test('any working days, several breaks, a short day and blocked slots are respected', () => {
+    const data = demoCollege()
+    data.time = {
+      days: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Sat'],
+      periodsPerDay: 8,
+      startTime: '08:00',
+      periodMinutes: 50,
+      breaks: [
+        { after: 2, minutes: 15, label: 'Tea break' },
+        { after: 5, minutes: 45, label: 'Lunch' },
+      ],
+      dayPeriods: { Sat: 4 },
+      blocked: { 'Wed-7': 'Sports', 'Wed-8': 'Sports', 'Sun-1': 'Assembly' },
+    }
+    data.teachers.forEach((t) => (t.unavailable = []))
+    const result = generateTimetable(data, { seed: 3 })
+    expect(result.ok).toBe(true)
+    expect(findClashes(result.entries, data)).toEqual([])
+    const at = (e, k) => `${data.time.days[e.day]}-${e.period + k + 1}`
+    for (const e of result.entries) {
+      for (let k = 0; k < e.length; k++) {
+        expect(['Wed-7', 'Wed-8', 'Sun-1']).not.toContain(at(e, k))
+        if (data.time.days[e.day] === 'Sat') expect(e.period + k).toBeLessThan(4)
+      }
+      // Never across a break: a block starting before period 2 or 5 must end by it.
+      for (const cut of [2, 5]) if (e.period < cut) expect(e.period + e.length).toBeLessThanOrEqual(cut)
+    }
+    expect(result.entries.some((e) => data.time.days[e.day] === 'Sun')).toBe(true)
+  })
+
+  test('findClashes reports a class placed in a blocked slot', () => {
+    const data = demoCollege()
+    const { entries } = generateTimetable(data, { seed: 1 })
+    const e = entries.find((x) => x.length === 1)
+    data.time.blocked = { [`${data.time.days[e.day]}-${e.period + 1}`]: 'Assembly' }
+    expect(findClashes(entries, data).some((c) => c.type === 'closed')).toBe(true)
+  })
+})

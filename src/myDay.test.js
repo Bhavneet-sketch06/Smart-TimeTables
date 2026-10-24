@@ -38,7 +38,7 @@ describe('My Day', () => {
 
   test('side-by-side lab groups are highlighted together, and the break is noticed', () => {
     const plan = planDay(data, entries, at('2026-10-26', '12:45'))
-    expect(plan.onBreak).toBe(true)
+    expect(plan.onBreak).toMatchObject({ start: '12:30', end: '13:30' })
     expect(plan.highlight.map((c) => c.entry.group)).toEqual(['A1', 'A2'])
   })
 

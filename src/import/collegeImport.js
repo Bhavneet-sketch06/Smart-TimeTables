@@ -9,7 +9,7 @@
 // setup and a record that already exists is an error (never overwritten); 'replace' swaps the whole setup.
 // Issues: { level: 'error' | 'warning' | 'info', table, source, line, field, message }; any error blocks the import.
 
-import { DEFAULT_TIME, ALL_DAYS, emptyCollege, uid } from '../data/schema.js'
+import { ALL_DAYS, breaksOf, emptyCollege, uid, withDefaults } from '../data/schema.js'
 import { normalizeCollege } from '../data/departments.js'
 import { precheck } from '../scheduler.js'
 import { FileFormatError, parseCsv, readXlsx } from './formats.js'
@@ -226,7 +226,7 @@ export function buildImport(sheets, current, { mode = 'add' } = {}) {
   const reuseId = (list, match, prefix) => list.find(match)?.id ?? uid(prefix)
 
   // ----- time -----
-  let time = { ...DEFAULT_TIME, ...(current.time ?? {}) }
+  let time = withDefaults(current.time)
   if (given('time')) {
     const next = { ...time }
     const seen = new Set()
@@ -261,9 +261,18 @@ export function buildImport(sheets, current, { mode = 'add' } = {}) {
         if (n != null) next[prop] = n
       }
     }
+    // A single break given the older way (break_after / break_minutes) replaces the breaks.
+    if (seen.has('break_after') || seen.has('break_minutes')) {
+      const after = seen.has('break_after') ? next.breakAfter : breaksOf(time)[0]?.after ?? 0
+      const minutes = seen.has('break_minutes') ? next.breakMinutes : breaksOf(time)[0]?.minutes ?? 30
+      next.breaks = after > 0 ? [{ after, minutes, label: 'Lunch break' }] : []
+      next.breakAfter = after
+    }
     if (next.breakAfter >= next.periodsPerDay) {
       report('error', { table: TABLES.time.label, source: records.time[0].source, field: 'break_after' }, `The break comes after period ${next.breakAfter}, but the day only has ${next.periodsPerDay} periods.`)
     }
+    delete next.breakAfter
+    delete next.breakMinutes
     if (replacing) time = next
     else {
       report('warning', { table: TABLES.time.label, source: records.time[0].source }, 'Not applied: when adding to the current setup, the current time structure is kept. Choose Replace to use the file\'s time structure.')

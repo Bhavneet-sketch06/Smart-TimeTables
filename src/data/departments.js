@@ -6,6 +6,7 @@
 // departments such as Applied Sciences), subject.deptId (optional), room.deptId (optional home department).
 
 import { collegeQuality, findClashes, runSummary } from '../scheduler.js'
+import { normalizeTime } from './schema.js'
 
 export const ALL = 'all'
 
@@ -46,7 +47,7 @@ export function normalizeCollege(data) {
   const teachers = data.teachers.map((t) =>
     t.deptId !== undefined ? t : { ...t, deptId: byShort.get(String(t.department || '').toLowerCase())?.id ?? null },
   )
-  return { ...data, departments, sections, teachers }
+  return { ...data, time: normalizeTime(data.time), departments, sections, teachers }
 }
 
 export const deptById = (data, id) => (data.departments || []).find((d) => d.id === id)

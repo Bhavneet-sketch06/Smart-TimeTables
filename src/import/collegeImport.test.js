@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { emptyCollege } from '../data/schema.js'
+import { emptyCollege, normalizeTime } from '../data/schema.js'
 import { demoCollege } from '../data/demoCollege.js'
 import { findClashes, generateCollege } from '../scheduler.js'
 import { FileFormatError, parseCsv, readXlsx, toCsv, writeXlsx } from './formats.js'
@@ -59,7 +59,7 @@ describe('import college data', () => {
     expect(result.counts).toMatchObject({ departments: 3, rooms: 10, subjects: 8, teachers: 8, sections: 4, assignments: 20, time: true })
     const { data } = result
     expect(data.meta.source).toBe('import')
-    expect(data.time).toMatchObject({ startTime: '09:00', breakMinutes: 45, periodsPerDay: 7 })
+    expect(data.time).toMatchObject({ startTime: '09:00', periodsPerDay: 7, breaks: [{ after: 4, minutes: 45 }] })
     expect(data.rooms.find((r) => r.name === 'Seminar Hall').eventsOnly).toBe(true)
     expect(data.teachers.find((t) => t.name === 'Dr. Asha Mehta').unavailable).toEqual(['Mon-1', 'Mon-2'])
     const tt = generateCollege(data, { seed: 2 })
@@ -118,7 +118,7 @@ describe('import college data', () => {
     expect(errors(result).some((i) => /"CS201" is already in your current setup/.test(i.message))).toBe(true)
     expect(result.issues.some((i) => i.table === 'Time structure' && /Not applied/.test(i.message))).toBe(true)
     expect(result.data.rooms.filter((r) => r.name === 'Seminar Hall')).toHaveLength(1)
-    expect(result.data.time).toEqual(current.time)
+    expect(result.data.time).toEqual(normalizeTime(current.time))
   })
 
   test('replacing swaps the setup but keeps ids of records with the same name', () => {

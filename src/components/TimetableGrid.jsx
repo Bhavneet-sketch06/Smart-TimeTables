@@ -1,5 +1,5 @@
 import { Coffee, FlaskConical, MapPin, UserRound, UsersRound } from 'lucide-react'
-import { periodTimes } from '../data/schema.js'
+import { DAY_NAMES, blockedOf, periodTimes, periodsOn, slotKey } from '../data/schema.js'
 
 // Full class names so Tailwind can see them at build time.
 // card: soft tinted card; bar: strong accent stripe and legend dot; chip: badges on the card.
@@ -21,7 +21,7 @@ const PALETTE = [
 ]
 const NEUTRAL = { card: 'bg-slate-50 border-slate-200 text-slate-900', bar: 'bg-slate-400', chip: 'bg-slate-100 text-slate-700' }
 
-export const DAY_NAMES = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday' }
+export { DAY_NAMES }
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export function makeLookup(data) {
@@ -155,8 +155,9 @@ function Legend({ entries, lk, mode }) {
 /** Days across the top, time slots down the side (desktop and print); stacked day cards on phones. */
 export default function TimetableGrid({ data, entries, mode = 'section', showLegend = true }) {
   const lk = makeLookup(data)
-  const { days, periodsPerDay: P, breakAfter } = data.time
-  const { periods, breakSlot } = periodTimes(data.time)
+  const { days, periodsPerDay: P } = data.time
+  const { periods, breaks } = periodTimes(data.time)
+  const blocked = blockedOf(data.time)
   const today = days.indexOf(WEEKDAYS[new Date().getDay()])
 
   // Group overlapping classes per day into blocks (lab groups can run in parallel or staggered);
@@ -180,22 +181,32 @@ export default function TimetableGrid({ data, entries, mode = 'section', showLeg
 
   const rows = []
   for (let p = 0; p < P; p++) {
-    if (breakSlot && p === breakAfter) {
+    for (const b of breaks.filter((x) => x.after === p)) {
       rows.push(
-        <tr key="break">
-          <th className="px-2 py-1 text-left text-sm font-semibold text-amber-700">{breakSlot.label}</th>
+        <tr key={`break${p}`}>
+          <th className="px-2 py-1 text-left text-sm font-semibold text-amber-700">{b.label}</th>
           <td colSpan={days.length}>
             <div className="flex items-center justify-center gap-2 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 py-2 font-semibold tracking-wide text-amber-800">
-              <Coffee className="h-4 w-4" /> Lunch break
+              <Coffee className="h-4 w-4" /> {b.name}
             </div>
           </td>
         </tr>,
       )
     }
-    const cells = days.map((_, d) => {
+    const cells = days.map((day, d) => {
       const key = `${d}|${p}`
       if (covered.has(key)) return null
       const block = blocks.get(key)
+      if (!block && p >= periodsOn(data.time, day)) {
+        return <td key={d} className="rounded-xl bg-slate-100/70" title="No periods: the day has ended" />
+      }
+      if (!block && slotKey(day, p) in blocked) {
+        return (
+          <td key={d} className="rounded-xl border border-amber-200 bg-amber-50 text-center text-sm font-semibold text-amber-800">
+            {blocked[slotKey(day, p)] || 'No classes'}
+          </td>
+        )
+      }
       if (!block) {
         return (
           <td
@@ -212,7 +223,7 @@ export default function TimetableGrid({ data, entries, mode = 'section', showLeg
         <td key={d} rowSpan={span} className="relative h-full align-top">
           {/* Multi-period blocks use an absolute fill so they stretch over every row they span;
               single-period cells stay in normal flow so the row grows to fit larger text. */}
-          {span > 1 ? (
+          {span > 1 || block.items.length > 1 ? (
             <BlockLanes block={block} span={span} mode={mode} lk={lk} />
           ) : (
             <div className="h-full">

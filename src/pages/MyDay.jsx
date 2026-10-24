@@ -108,7 +108,8 @@ function BreakRow({ slot, on }) {
           on ? 'border-amber-300 bg-amber-50 font-semibold text-amber-800' : 'border-slate-300 text-slate-500'
         }`}
       >
-        <Coffee className="h-4 w-4" /> {on ? 'Break now' : 'Break'} · {slot.label.replace(' - ', ' – ')}
+        <Coffee className="h-4 w-4" /> {slot.name}
+        {on ? ' (now)' : ''} · {slot.label.replace(' - ', ' – ')}
       </div>
     </li>
   )
@@ -159,9 +160,9 @@ export default function MyDay({ data, entries, sectionName, groupHint, onWeek })
   const plan = planDay(data, entries, now)
   const lk = makeLookup(data)
   const date = now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
-  // Show the break between the classes that come before and after it.
-  const breakAt = plan.breakSlot && plan.classes.findIndex((c) => c.start >= plan.breakSlot.end)
-  const showBreak = breakAt > 0
+  // Each break goes between the classes before and after it (only when there are classes on both sides).
+  const breaksBefore = (i) =>
+    i === 0 ? [] : plan.breaks.filter((b) => b.start >= plan.classes[i - 1].end && b.end <= plan.classes[i].start)
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -175,7 +176,7 @@ export default function MyDay({ data, entries, sectionName, groupHint, onWeek })
         <>
           {plan.onBreak && plan.highlight[0].status === 'next' && (
             <p className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700">
-              <Coffee className="h-4 w-4" /> Break until {plan.breakSlot.end}
+              <Coffee className="h-4 w-4" /> {plan.onBreak.name} until {plan.onBreak.end}
             </p>
           )}
           <Highlight plan={plan} lk={lk} />
@@ -195,7 +196,7 @@ export default function MyDay({ data, entries, sectionName, groupHint, onWeek })
                 key={`${c.entry.subjectId}-${c.entry.period}-${c.entry.group ?? ''}`}
                 c={c}
                 lk={lk}
-                breakSlot={showBreak && i === breakAt ? plan.breakSlot : null}
+                breaks={breaksBefore(i)}
                 onBreak={plan.onBreak}
               />
             ))}
@@ -206,10 +207,12 @@ export default function MyDay({ data, entries, sectionName, groupHint, onWeek })
   )
 }
 
-function ClassRowWithBreak({ c, lk, breakSlot, onBreak }) {
+function ClassRowWithBreak({ c, lk, breaks, onBreak }) {
   return (
     <>
-      {breakSlot && <BreakRow slot={breakSlot} on={onBreak} />}
+      {breaks.map((b) => (
+        <BreakRow key={b.start} slot={b} on={onBreak === b} />
+      ))}
       <ClassRow c={c} lk={lk} />
     </>
   )
