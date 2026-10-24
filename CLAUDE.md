@@ -32,6 +32,8 @@ src/
   booking.js, booking.test.js    # PURE JS: Book a Space room checks, suggestions, demo bookings (seedBookings)
   scheduler.js                   # PURE JS: precheck, generateTimetable, findClashes, scoreQuality
   scheduler.test.js              # runs scheduler on demo data, asserts zero clashes
+  diagnose.js, diagnose.test.js  # PURE JS: failure guidance (causes ranked, suggested changes, pre-check/quick-test checks)
+  myDay.js, myDay.test.js        # PURE JS: a student's day (classes in time order, now/next, next teaching day)
   data/
     schema.js                    # emptyCollege(), uid(), periodTimes(), data-shape docs
     demoCollege.js               # sample college (3 depts, 6 sections, 12 teachers, 8 rooms)
@@ -43,14 +45,14 @@ src/
   hooks/usePrefs.js              # theme (light/dark/system) (key `ttgen:prefs`)
   theme-dark.css                 # GENERATED: dark theme flips Tailwind colour scales under `.dark`
   components/                    # TimetableGrid (days across, times down, legend), TimetableSheet (title + Print),
-                                 # SummaryPanel, PrefsControls, ChatWidget, DepartmentBar (+ HOD picker),
+                                 # SummaryPanel, FailureGuidance, PrefsControls, ChatWidget, DepartmentBar (+ HOD picker),
                                  # DepartmentEmpty ("set up / generate this department" prompt), ui bits
   pages/
     Landing.jsx                  # role selector
     admin/                       # setup wizard: Time → Rooms → Subjects → Teachers → Sections
                                  # (subjects before teachers so "can teach" has options); listUtils.js helpers
     TimetableViews.jsx           # section / teacher / room tabs + summary (Admin, HOD)
-    FacultyView.jsx, StudentView.jsx
+    FacultyView.jsx, StudentView.jsx  # StudentView switches between MyDay.jsx and the weekly sheet
     booking/                     # BookSpace (4-step flow + receipt), BookingsList, BookingReceipt
 ```
 
@@ -94,6 +96,9 @@ blocks only its own group, so groups can be in different labs at the same time.
 6. Step limit + random restarts + time budget (`timeLimitMs`, default 4000); on failure returns a plain-language `reason`.
    Identical units (same section/subject/kind) share a `group` and are placed in order to avoid symmetric thrashing.
 7. `findClashes(entries, data)` is an independent verifier used by the UI and the test.
+   Failures carry structure for `diagnose.js`: `precheck` returns `issues` ({ kind, key, message, ...facts }) next to
+   `problems`, and a failed search returns `failure` (the hardest unit and what blocked each start time). Guidance
+   must say what is confirmed vs likely; a suggestion is only called a fix if the pre-check or `testChange` shows it.
 8. Departments: `generateTimetable(data, { departmentId, fixedEntries })` schedules one department's sections around
    other departments' existing classes (their rooms and teachers are pre-marked busy); `generateCollege` runs every
    department in turn, largest first. Units prefer their department's rooms, then shared rooms, then others'.
@@ -111,7 +116,7 @@ blocks only its own group, so groups can be in different labs at the same time.
 - Printing: render timetables through `TimetableSheet` and mark everything else `print:hidden`; index.css sets
   A4 landscape and a smaller root font for print, and usePrefs switches to the light theme while printing.
 - Keep components small and functional; state flows from `useCollegeData` in `App.jsx` via props.
-- Other localStorage keys (`ttgen:role`, `ttgen:student`, `ttgen:faculty`) are per-viewer conveniences only; wrap all storage access in try/catch.
+- Other localStorage keys (`ttgen:role`, `ttgen:student`, `ttgen:studentView`, `ttgen:faculty`) are per-viewer conveniences only; wrap all storage access in try/catch.
 - Editing any input through `update()` clears the stored timetable (it would be stale).
 - Book a Space: bookings change only through `bookSpace` / `cancelBooking` / `addSampleBookings` in
   `useCollegeData`, which re-read the saved bookings, re-check the room and write immediately. The autosave
