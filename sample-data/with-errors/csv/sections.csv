@@ -1,12 +1,12 @@
-﻿name,department,semester,students,lab_groups,group_names
-CSE 3A,CSE,3rd Sem,60,2,"A1;A2"
-CSE 3B,CSE,3rd Sem,60,2,"B1;B2"
-CSE 5A,CSE,5th Sem,58,2,"A1;A2"
-CSE 5B,CSE,5th Sem,56,2,"B1;B2"
-IT 3A,IT,3rd Sem,60,2,"A1;A2"
-IT 5A,IT,5th Sem,54,2,"A1;A2"
-ECE 3A,ECE,3rd Sem,60,2,"A1;A2"
-ECE 3B,ECE,3rd Sem,58,2,"B1;B2"
-ECE 5A,EEE,5th Sem,50,2,"A1;A2"
-ME 3A,ME,3rd Sem,60,2,"A1;A2"
-ME 5A,ME,5th Sem,45,2,"A1;A2"
+﻿name,department,semester,students,lab_groups,group_names,max_per_day
+CSE 3A,CSE,3rd Sem,60,2,"A1;A2",7
+CSE 3B,CSE,3rd Sem,60,2,"B1;B2",7
+CSE 5A,CSE,5th Sem,58,2,"A1;A2",7
+CSE 5B,CSE,5th Sem,56,2,"B1;B2",7
+IT 3A,IT,3rd Sem,60,2,"A1;A2",7
+IT 5A,IT,5th Sem,54,2,"A1;A2",7
+ECE 3A,ECE,3rd Sem,60,2,"A1;A2",7
+ECE 3B,ECE,3rd Sem,58,2,"B1;B2",7
+ECE 5A,EEE,5th Sem,50,2,"A1;A2",7
+ME 3A,ME,3rd Sem,60,2,"A1;A2",7
+ME 5A,ME,5th Sem,45,2,"A1;A2",7

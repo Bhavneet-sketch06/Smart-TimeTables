@@ -3,7 +3,7 @@ import { emptyCollege, normalizeTime } from '../data/schema.js'
 import { demoCollege } from '../data/demoCollege.js'
 import { findClashes, generateCollege } from '../scheduler.js'
 import { FileFormatError, parseCsv, readXlsx, toCsv, writeXlsx } from './formats.js'
-import { autoMap, buildImport, detectTable, readUpload, sheetFrom } from './collegeImport.js'
+import { autoMap, buildImport, detectTable, readUpload, sheetFrom, suggestMode } from './collegeImport.js'
 import { TABLE_KEYS, TABLES, templateRows, templateSheets } from './tables.js'
 
 const text = (rows) => rows.map((r) => r.map((c) => String(c)))
@@ -56,10 +56,19 @@ describe('import college data', () => {
     const result = buildImport(sampleSheets(), emptyCollege())
     expect(errors(result)).toEqual([])
     expect(result.issues.filter((i) => i.level === 'warning')).toEqual([])
-    expect(result.counts).toMatchObject({ departments: 3, rooms: 10, subjects: 8, teachers: 8, sections: 4, assignments: 20, time: true })
+    expect(result.counts).toMatchObject({ departments: 3, rooms: 11, subjects: 8, teachers: 8, sections: 4, assignments: 20, time: true })
+    // The newer settings come through: breaks, a no-class slot, room types, room needs, double periods, tutorials, limits.
+    expect(result.data.time.breaks.map((b) => b.after)).toEqual([2, 4])
+    expect(result.data.time.blocked).toEqual({ 'Wed-7': 'Sports' })
+    const computerLab = result.data.roomTypes.find((t) => t.name === 'Computer lab')
+    expect(computerLab.kind).toBe('lab')
+    expect(result.data.subjects.find((s) => s.code === 'CS201')).toMatchObject({ labRoomType: computerLab.id, labNeeds: ['Computers'] })
+    expect(result.data.subjects.find((s) => s.code === 'CS203').lectureBlock).toBe(2)
+    expect(result.data.subjects.find((s) => s.code === 'MA201').tutorialHours).toBe(1)
+    expect(result.data.teachers.find((t) => t.name === 'Mr. Arjun Das').maxPerDay).toBe(4)
     const { data } = result
     expect(data.meta.source).toBe('import')
-    expect(data.time).toMatchObject({ startTime: '09:00', periodsPerDay: 7, breaks: [{ after: 4, minutes: 45 }] })
+    expect(data.time).toMatchObject({ startTime: '09:00', periodsPerDay: 7, breaks: [{ after: 2, minutes: 15 }, { after: 4, minutes: 45 }] })
     expect(data.rooms.find((r) => r.name === 'Seminar Hall').eventsOnly).toBe(true)
     expect(data.teachers.find((t) => t.name === 'Dr. Asha Mehta').unavailable).toEqual(['Mon-1', 'Mon-2'])
     const tt = generateCollege(data, { seed: 2 })
@@ -78,18 +87,18 @@ describe('import college data', () => {
   test('reports row-level errors for bad values, duplicates and missing references', () => {
     const sheets = sampleSheets()
     const rooms = sheets.find((s) => s.table === 'rooms')
-    rooms.rows[2] = ['A-102', 'forty', 'gym', 'CSE', '', 'maybe']
+    rooms.rows[2] = ['A-102', 'forty', '', 'CSE', '', 'maybe']
     rooms.rows[3] = ['A-101', '70', 'classroom', 'XYZ', '', 'no']
     const assignments = sheets.find((s) => s.table === 'assignments')
     assignments.rows[1] = ['CSE-3A', 'CS999', 'Dr. Nobody', '']
     const teachers = sheets.find((s) => s.table === 'teachers')
-    teachers.rows[1][4] = 'Sun-1;Mon-9;lunch'
+    teachers.rows[1][5] = 'Sun-1;Mon-9;lunch'
     const result = buildImport(sheets, emptyCollege())
     expect(result.ok).toBe(false)
     const says = (line, field, re) =>
       expect(errors(result).some((i) => i.line === line && i.field === field && re.test(i.message)), `${line} ${field} ${re}`).toBe(true)
     says(3, 'capacity', /"forty" is not a whole number/)
-    says(3, 'type', /"gym" isn't a room type/)
+    says(3, 'type', /The room type is required/)
     says(3, 'events_only', /should be yes or no/)
     says(4, 'name', /appears twice \(also on row 2\)/)
     says(2, 'subject', /Subject "CS999" isn't in the subjects table/)
@@ -114,7 +123,7 @@ describe('import college data', () => {
     const result = buildImport(sheets, current, { mode: 'add' })
     expect(result.mode).toBe('add')
     // The demo college already has a Seminar Hall and the same subject codes.
-    expect(errors(result).some((i) => i.line === 11 && /"Seminar Hall" is already in your current setup/.test(i.message))).toBe(true)
+    expect(errors(result).some((i) => /"Seminar Hall" is already in your current setup/.test(i.message))).toBe(true)
     expect(errors(result).some((i) => /"CS201" is already in your current setup/.test(i.message))).toBe(true)
     expect(result.issues.some((i) => i.table === 'Time structure' && /Not applied/.test(i.message))).toBe(true)
     expect(result.data.rooms.filter((r) => r.name === 'Seminar Hall')).toHaveLength(1)
@@ -126,7 +135,7 @@ describe('import college data', () => {
     const lab = current.rooms.find((r) => r.name === 'Computer Lab 1')
     const result = buildImport(sampleSheets(), current, { mode: 'replace' })
     expect(errors(result)).toEqual([])
-    expect(result.data.rooms).toHaveLength(10)
+    expect(result.data.rooms).toHaveLength(11)
     expect(result.data.rooms.find((r) => r.name === 'Computer Lab 1').id).toBe(lab.id)
   })
 
@@ -145,4 +154,70 @@ test('a row with its own error does not cause misleading errors in rows that ref
   const found = errors(buildImport(sheets, emptyCollege()))
   expect(found).toHaveLength(1)
   expect(found[0]).toMatchObject({ line: 2, field: 'max_hours' })
+})
+
+describe('import modes', () => {
+  const imported = () => buildImport(sampleSheets(), emptyCollege()).data
+
+  test('update & add changes only the columns in the file and keeps everything else', () => {
+    const current = imported()
+    const asha = current.teachers.find((t) => t.name === 'Dr. Asha Mehta')
+    const sheet = sheetFrom('teachers.csv', [
+      ['name', 'max_hours'],
+      ['Dr. Asha Mehta', '20'],
+      ['Dr. New Person', '12'],
+    ])
+    const result = buildImport([sheet], current, { mode: 'update' })
+    expect(errors(result)).toEqual([])
+    const updated = result.data.teachers.find((t) => t.name === 'Dr. Asha Mehta')
+    expect(updated).toMatchObject({ id: asha.id, maxHours: 20, subjectIds: asha.subjectIds, unavailable: ['Mon-1', 'Mon-2'] })
+    expect(result.data.teachers).toHaveLength(current.teachers.length + 1)
+    expect(result.counts).toMatchObject({ teachers: 2, updated: { teachers: 1 } })
+    expect(result.data.sections).toEqual(current.sections)
+  })
+
+  test('update & add replaces a section\'s subjects with the assignment rows for it', () => {
+    const current = imported()
+    const sheet = sheetFrom('assignments.csv', [
+      ['section', 'subject', 'teacher'],
+      ['CSE-3A', 'CS201', 'Dr. Asha Mehta'],
+      ['CSE-3A', 'HU201', 'Ms. Sana Khan'],
+    ])
+    const result = buildImport([sheet], current, { mode: 'update' })
+    expect(errors(result)).toEqual([])
+    expect(result.data.sections.find((s) => s.name === 'CSE-3A').assignments).toHaveLength(2)
+    expect(result.data.sections.find((s) => s.name === 'CSE-3B').assignments).toHaveLength(5)
+  })
+
+  test('adding reuses existing departments and room types instead of rejecting them', () => {
+    const current = imported()
+    const sheets = [
+      sheetFrom('departments.csv', [['code', 'name'], ['CSE', 'Computer Science & Engineering']]),
+      sheetFrom('rooms.csv', [['name', 'capacity', 'type', 'department'], ['A-301', '60', 'Computer lab', 'CSE']]),
+    ]
+    const result = buildImport(sheets, current, { mode: 'add' })
+    expect(errors(result)).toEqual([])
+    expect(result.data.departments.filter((d) => d.short === 'CSE')).toHaveLength(1)
+    const room = result.data.rooms.find((r) => r.name === 'A-301')
+    expect(result.data.roomTypes.find((t) => t.id === room.type).name).toBe('Computer lab')
+  })
+
+  test('suggests Replace for a complete, different college, Update for a familiar one, Add for new records', () => {
+    expect(suggestMode(sampleSheets(), demoCollege()).mode).toBe('replace')
+    expect(suggestMode(sampleSheets(), imported()).mode).toBe('update')
+    expect(suggestMode([sheetFrom('rooms.csv', [['name', 'capacity', 'type'], ['Z-1', '30', 'classroom']])], imported()).mode).toBe('add')
+    expect(suggestMode(sampleSheets(), emptyCollege()).mode).toBe('replace')
+  })
+
+  test('time settings: any working days in order, short days and errors for impossible values', () => {
+    const sheet = (rows) => sheetFrom('time.csv', [['setting', 'value'], ...rows])
+    const sheets = (rows) => [sheet(rows), ...sampleSheets().filter((s) => s.table !== 'time')]
+    const ok = buildImport(sheets([['days', 'Sun;Mon;Tue;Wed;Thu;Fri'], ['periods_per_day', '7'], ['breaks', '3:30:Lunch'], ['day_periods', 'Thu:4']]), emptyCollege())
+    expect(errors(ok)).toEqual([])
+    expect(ok.data.time).toMatchObject({ days: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'], dayPeriods: { Thu: 4 }, breaks: [{ after: 3, minutes: 30, label: 'Lunch' }] })
+    const bad = errors(buildImport(sheets([['breaks', '9:30:Lunch'], ['day_periods', 'Sat:4'], ['blocked', 'Mon-12:Assembly']]), emptyCollege()))
+    expect(bad.map((i) => i.message).join(' ')).toMatch(/break after period 9 isn't between two periods/)
+    expect(bad.map((i) => i.message).join(' ')).toMatch(/Sat isn't one of the working days/)
+    expect(bad.map((i) => i.message).join(' ')).toMatch(/"Mon-12" isn't a period of the week/)
+  })
 })

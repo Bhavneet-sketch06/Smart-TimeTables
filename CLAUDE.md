@@ -37,7 +37,8 @@ src/
   import/                        # PURE JS: Import College Data (no dependencies, nothing leaves the browser)
     formats.js                   # CSV parse/write, .xlsx read (zip + DecompressionStream) and minimal .xlsx write
     tables.js                    # accepted tables/columns (+ synonyms), sample college used for templates and demo
-    collegeImport.js             # readUpload, detectTable/autoMap, buildImport (row-level validation, add/replace)
+    collegeImport.js             # readUpload, detectTable/autoMap, suggestMode, buildImport (add / update / replace)
+  rules.test.js                  # room requirements and teaching rules end to end
   data/
     schema.js                    # emptyCollege(), uid(), periodTimes(), data-shape docs
     demoCollege.js               # sample college (3 depts, 6 sections, 12 teachers, 8 rooms)
@@ -65,13 +66,19 @@ src/
 ```js
 {
   meta: null | { name, note },                                   // where the data came from
-  departments: [{ id, short, name, source?: "gndec" | "sample", note? }],
-  time: { days: ["Mon", ...], periodsPerDay: 7, breakAfter: 4,    // break between P4 and P5
-          startTime: "08:30", periodMinutes: 60, breakMinutes: 60 },
-  rooms:    [{ id, name, capacity, type: "classroom" | "lab" | "seminar" }],
-  teachers: [{ id, name, department, subjectIds, maxHours, unavailable: ["Mon-1", ...] }],
-  subjects: [{ id, name, code, lectureHours, labHours, labSessions? }], // labHours = length of ONE lab block
-  sections: [{ id, name, department, students, labGroups?, groupNames?,
+  departments: [{ id, short, name, source?: "gndec" | "sample" | "import", note? }],
+  time: { days: ["Mon", ...],            // any of Mon..Sun, in the college's week order
+          periodsPerDay: 7,              // periods on the longest day
+          startTime: "08:30", periodMinutes: 60,
+          breaks: [{ after: 4, minutes: 60, label: "Lunch break" }],   // any number; blocks never cross one
+          dayPeriods?: { Sat: 4 },       // shorter days
+          blocked?: { "Wed-7": "Sports" } },                           // college-wide no-class slots
+  roomTypes: [{ id, name, kind: "lecture" | "lab" }],  // defaults classroom/lab/seminar + the college's own
+  rooms:    [{ id, name, capacity, type: roomTypes id }],
+  teachers: [{ id, name, department, subjectIds, maxHours, maxPerDay?, unavailable: ["Mon-1", ...] }],
+  subjects: [{ id, name, code, lectureHours, lectureBlock?, tutorialHours?, labHours, labSessions?,
+               lectureRoomType?, lectureNeeds?: [], labRoomType?, labNeeds?: [] }], // labHours = length of ONE lab block
+  sections: [{ id, name, department, students, labGroups?, groupNames?, maxPerDay?,
                assignments: [{ subjectId, teacherId, labTeacherId? }] }],
   timetable: null | { entries, stats, generatedAt },
   bookings: [{ id, status: "confirmed" | "cancelled", eventType, title, department, organizerId?, organizerName,
@@ -80,12 +87,19 @@ src/
 }
 ```
 Rooms may have `facilities: string[]` and `eventsOnly: true` (never used for classes, only bookings).
+Older saved data (single `breakAfter` / `breakMinutes`, no `roomTypes`) is upgraded by `normalizeCollege` via
+`normalizeTime` / `roomTypesOf`; time helpers live in `data/schema.js` (`breaksOf`, `periodsOn`, `isClosed`,
+`segmentsOf`, `blocksPerWeek`, `openPeriodsOf`, `withDefaults`). Never read `time.breakAfter` directly.
+Rooms are matched with `roomMatcher(data)` / `needOf(subject, kind)` in scheduler.js: a room's type `kind` must
+suit the class (labs in lab kinds; lectures and tutorials in lecture kinds) unless the subject names a type, and it
+must have every required facility. Lectures run in blocks of `lectureBlock` periods (`lectureBlocksOf`); tutorials
+are 1-period classes per lab group (kind "tutorial"); `maxPerDay` limits are hard constraints.
 
 Departments: sections have `deptId` and `batch` (e.g. "3rd Sem (D2)"; the old free-text `department` is kept for
 display); teachers/subjects/rooms have an optional `deptId` (home department; null = service department / shared).
 `normalizeCollege` upgrades older saved data on every load. Rooms are always college-wide.
 `timetable.byDept[deptId]` holds each department's last run (stats, reason, unplaced).
-Timetable entry: `{ sectionId, subjectId, teacherId, roomId, day, period, length, kind: "lecture" | "lab", group?, groupIndex? }`. `day` is a 0-based index, `period` is 0-based internally.
+Timetable entry: `{ sectionId, subjectId, teacherId, roomId, day, period, length, kind: "lecture" | "lab" | "tutorial", group?, groupIndex? }`. `day` is a 0-based index, `period` is 0-based internally.
 
 Lab groups: a section with `labGroups: 2` takes each lab as two group units (e.g. A1, A2), each needing a lab
 room for half the students; `labSessions` lab blocks per group per week. Lectures block every group; a lab
@@ -123,10 +137,11 @@ blocks only its own group, so groups can be in different labs at the same time.
 - Keep components small and functional; state flows from `useCollegeData` in `App.jsx` via props.
 - Other localStorage keys (`ttgen:role`, `ttgen:student`, `ttgen:studentView`, `ttgen:faculty`) are per-viewer conveniences only; wrap all storage access in try/catch.
 - Editing any input through `update()` clears the stored timetable (it would be stale).
-- Import College Data: one table per CSV file or per .xlsx sheet (time, departments, rooms, subjects, teachers,
-  sections, assignments); records refer to each other by department code, subject code, section and teacher name.
-  `buildImport` never overwrites: "add" reports clashes with the current setup as errors, "replace" needs a confirm
-  and keeps ids of same-named records. Any error blocks the import; the generator's precheck shows as warnings.
+- Import College Data: one table per CSV file or per .xlsx sheet (time, departments, room_types, rooms, subjects,
+  teachers, sections, assignments); records refer to each other by department code, room type name, subject code,
+  section and teacher name. Modes: "add" never overwrites (clashes are errors; departments and room types are reused),
+  "update" changes only the mapped columns of matching records and adds new ones, "replace" needs a confirm and keeps
+  ids of same-named records. `suggestMode` picks one. Any error blocks the import; the precheck shows as warnings.
   Saved through `importCollege` in useCollegeData (bookings kept, timetable cleared); imported data has
   `meta.source: 'import'` and departments `source: 'import'`.
 - Book a Space: bookings change only through `bookSpace` / `cancelBooking` / `addSampleBookings` in

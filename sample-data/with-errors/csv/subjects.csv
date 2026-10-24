@@ -1,37 +1,37 @@
-﻿code,name,lecture_hours,lab_hours,lab_sessions,department
-CS301,Data Structures,3,2,1,CSE
-CS302,Object Oriented Programming,3,2,1,CSE
-CS303,Discrete Mathematics,4,0,,CSE
-CS304,Computer Architecture,3,0,,CSE
-CS501,Operating Systems,3,2,1,CSE
-CS502,Database Management Systems,3,2,1,CSE
-CS503,Computer Networks,3,2,1,CSE
-CS504,Theory of Computation,4,0,,CSE
-CS505,Software Engineering,3,0,,CSE
-IT301,Data Structures & Algorithms,3,2,1,IT
-IT302,Web Technologies,3,2,2,IT
-IT303,Database Systems,3,2,1,IT
-IT304,Discrete Structures,3,0,,IT
-IT501,Cloud Computing,3,2,1,IT
-IT502,Data Communication & Networks,3,2,1,IT
-IT503,Software Testing,3,0,,IT
-IT504,Data Mining,3,0,,IT
-EC301,Electronic Devices & Circuits,3,2,1,ECE
-EC302,Digital Electronics,3,2,1,ECE
-EC303,Signals & Systems,4,0,,ECE
-EC304,Network Analysis,3,0,,ECE
-EC501,Microprocessors & Microcontrollers,3,2,1,ECE
-EC502,Analog & Digital Communication,3,2,1,ECE
-EC503,Control Systems,3,0,,ECE
-EC504,Electromagnetic Waves,3,0,,ECE
-ME301,Strength of Materials,3,2,1,ME
-ME302,Engineering Thermodynamics,4,0,,ME
-ME303,Manufacturing Processes,3,2,1,ME
-ME304,Machine Drawing,1,3,1,ME
-ME501,Heat Transfer,3,2,1,ME
-ME502,Fluid Mechanics & Machines,3,2,1,ME
-ME503,Dynamics of Machines,4,0,,ME
-ME504,Industrial Engineering,3,0,,ME
-MA301,Engineering Mathematics III,4,0,,AS
-HU301,Professional Communication,2,0,,HUM
-HU501,Entrepreneurship & Management,2,0,,HUM
+﻿code,name,lecture_hours,lecture_block,tutorial_hours,lab_hours,lab_sessions,department,lecture_room_type,lecture_needs,lab_room_type,lab_needs
+CS301,Data Structures,3,1,0,2,1,CSE,,,Computer lab,Computers
+CS302,Object Oriented Programming,3,1,0,2,1,CSE,,,Computer lab,
+CS303,Discrete Mathematics,3,1,1,0,,CSE,,,,
+CS304,Computer Architecture,3,1,0,0,,CSE,,Projector,,
+CS501,Operating Systems,3,1,0,2,1,CSE,,,Computer lab,
+CS502,Database Management Systems,3,1,0,2,1,CSE,,,Computer lab,
+CS503,Computer Networks,3,1,0,2,1,CSE,,,Computer lab,Network rack
+CS504,Theory of Computation,4,2,0,0,,CSE,,,,
+CS505,Software Engineering,3,1,0,0,,CSE,,,,
+IT301,Data Structures & Algorithms,3,1,0,2,1,IT,,,Computer lab,
+IT302,Web Technologies,3,1,0,2,2,IT,,,Computer lab,
+IT303,Database Systems,3,1,0,2,1,IT,,,Computer lab,
+IT304,Discrete Structures,3,1,0,0,,IT,,,,
+IT501,Cloud Computing,3,1,0,2,1,IT,,,Computer lab,
+IT502,Data Communication & Networks,3,1,0,2,1,IT,,,Computer lab,
+IT503,Software Testing,3,1,0,0,,IT,,,,
+IT504,Data Mining,3,1,0,0,,IT,,,,
+EC301,Electronic Devices & Circuits,3,1,0,2,1,ECE,,,Electronics lab,Oscilloscopes
+EC302,Digital Electronics,3,1,0,2,1,ECE,,,Electronics lab,
+EC303,Signals & Systems,4,2,0,0,,ECE,,,,
+EC304,Network Analysis,3,1,1,0,,ECE,,,,
+EC501,Microprocessors & Microcontrollers,3,1,0,2,1,ECE,,,Electronics lab,Trainer kits
+EC502,Analog & Digital Communication,3,1,0,2,1,ECE,,,Electronics lab,
+EC503,Control Systems,3,1,0,0,,ECE,,,,
+EC504,Electromagnetic Waves,3,1,0,0,,ECE,,,,
+ME301,Strength of Materials,3,1,0,2,1,ME,,,Mechanical lab,Universal testing machine
+ME302,Engineering Thermodynamics,4,2,0,0,,ME,,,,
+ME303,Manufacturing Processes,3,1,0,2,1,ME,,,Workshop,
+ME304,Machine Drawing,1,1,0,3,1,ME,,,Drafting studio,
+ME501,Heat Transfer,3,1,0,2,1,ME,,,Mechanical lab,Heat exchangers
+ME502,Fluid Mechanics & Machines,3,1,0,2,1,ME,,,Mechanical lab,Flow bench
+ME503,Dynamics of Machines,4,2,0,0,,ME,,,,
+ME504,Industrial Engineering,3,1,0,0,,ME,,,,
+MA301,Engineering Mathematics III,3,1,1,0,,AS,,,,
+HU301,Professional Communication,2,1,0,0,,HUM,,,,
+HU501,Entrepreneurship & Management,2,1,0,0,,HUM,,,,

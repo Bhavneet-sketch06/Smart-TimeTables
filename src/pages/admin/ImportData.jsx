@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, CalendarCog, CircleCheck, Download, FileUp, FlaskConical, ListChecks, ShieldCheck, Upload } from 'lucide-react'
+import { ArrowLeft, CalendarCog, CircleCheck, Download, FileUp, FlaskConical, Lightbulb, ListChecks, ShieldCheck, Upload } from 'lucide-react'
 import { Button, Card } from '../../components/ui.jsx'
-import { LIMITS, buildImport, isSetupEmpty, readUpload, sheetFrom } from '../../import/collegeImport.js'
+import { LIMITS, buildImport, isSetupEmpty, readUpload, sheetFrom, suggestMode } from '../../import/collegeImport.js'
 import { FileFormatError, toCsv, writeXlsx } from '../../import/formats.js'
 import { SAMPLE_NAME, TABLES, TABLE_KEYS, templateRows, templateSheets } from '../../import/tables.js'
 import { IssueList, SheetCard } from './ImportReview.jsx'
 
 const COUNT_LABELS = [
   ['departments', 'department'],
+  ['roomTypes', 'room type'],
   ['rooms', 'room'],
   ['subjects', 'subject'],
   ['teachers', 'teacher'],
@@ -16,8 +17,17 @@ const COUNT_LABELS = [
 ]
 const countText = (counts) =>
   COUNT_LABELS.filter(([k]) => counts[k])
-    .map(([k, word]) => `${counts[k]} ${counts[k] === 1 ? word : `${word}s`}`)
+    .map(([k, word]) => {
+      const updated = counts.updated?.[k]
+      return `${counts[k]} ${counts[k] === 1 ? word : `${word}s`}${updated ? ` (${updated} updated)` : ''}`
+    })
     .join(', ')
+
+const MODES = [
+  ['add', 'Add to the current setup', 'Keeps everything and adds the new records. A room, subject, teacher or section that already exists is an error, never overwritten. The time structure is not changed.'],
+  ['update', 'Update & add', 'Records that already exist (same name or code) are updated from the columns in the file, new ones are added, and nothing is removed. Sections in the assignments file get exactly those subjects.'],
+  ['replace', 'Replace the current setup', 'The file becomes the whole setup: current departments, rooms, subjects, teachers and sections are replaced (records with the same name keep their identity). Asks for confirmation.'],
+]
 
 function download(name, data, type) {
   const url = URL.createObjectURL(new Blob([data], { type }))
@@ -158,11 +168,13 @@ export default function ImportData({ college, onContinue, onManual }) {
   const [sheets, setSheets] = useState([])
   const [readErrors, setReadErrors] = useState([])
   const [reading, setReading] = useState(false)
-  const [mode, setMode] = useState('add')
+  const [mode, setMode] = useState(null) // null = the suggested mode
   const [done, setDone] = useState(null)
   const empty = isSetupEmpty(data)
 
-  const result = useMemo(() => (sheets.length ? buildImport(sheets, data, { mode }) : null), [sheets, data, mode])
+  const suggestion = useMemo(() => (sheets.length ? suggestMode(sheets, data) : null), [sheets, data])
+  const chosen = mode ?? suggestion?.mode ?? 'add'
+  const result = useMemo(() => (sheets.length ? buildImport(sheets, data, { mode: chosen }) : null), [sheets, data, chosen])
 
   const addFiles = async (files) => {
     if (!files.length) return
@@ -190,6 +202,7 @@ export default function ImportData({ college, onContinue, onManual }) {
   const startOver = () => {
     setSheets([])
     setReadErrors([])
+    setMode(null)
   }
 
   const apply = () => {
@@ -206,6 +219,7 @@ export default function ImportData({ college, onContinue, onManual }) {
     importCollege(result.data)
     setDone({ counts: result.counts, mode: result.mode, warnings: result.issues.filter((i) => i.level === 'warning') })
     setSheets([])
+    setMode(null)
   }
 
   const header = (
@@ -230,7 +244,8 @@ export default function ImportData({ college, onContinue, onManual }) {
             <CircleCheck className="h-5 w-5" /> Import complete
           </p>
           <p className="text-slate-700">
-            {done.mode === 'replace' ? 'The setup now holds' : 'Added to the setup'}: {countText(done.counts) || 'no new records'}
+            {done.mode === 'replace' ? 'The setup now holds' : done.mode === 'update' ? 'Updated and added' : 'Added to the setup'}:{' '}
+            {countText(done.counts) || 'no new records'}
             {done.counts.time ? ', and the time structure from the file' : ''}.
           </p>
           {precheck.length > 0 ? (
@@ -295,8 +310,59 @@ export default function ImportData({ college, onContinue, onManual }) {
         {readErrors.length > 0 && <IssueList issues={readErrors.map((message) => ({ level: 'error', table: 'Files', message }))} />}
       </div>
 
+      <Card className="space-y-3">
+        <h3 className="text-lg font-semibold">2. How to import</h3>
+        {empty ? (
+          <p className="text-sm text-slate-600">The setup is empty, so the imported data becomes the college setup.</p>
+        ) : (
+          <>
+            {suggestion && (
+              <p className="flex items-start gap-1.5 text-sm text-slate-700">
+                <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                <span>
+                  <b>Suggested: {MODES.find(([v]) => v === suggestion.mode)[1]}.</b> {suggestion.reason}
+                </span>
+              </p>
+            )}
+            <fieldset className="grid gap-2 lg:grid-cols-3">
+              {MODES.map(([value, title, text]) => (
+                <label
+                  key={value}
+                  className={`flex cursor-pointer gap-2 rounded-xl border p-3 text-sm ${
+                    chosen === value ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'
+                  }`}
+                >
+                  <input type="radio" name="import-mode" checked={chosen === value} onChange={() => setMode(value)} className="mt-1" />
+                  <span>
+                    <b className="text-slate-900">
+                      {title}
+                      {value === suggestion?.mode ? ' (suggested)' : ''}
+                    </b>
+                    <span className="block text-slate-600">{text}</span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          </>
+        )}
+      </Card>
+
       <div className="space-y-2">
-        <h3 className="text-lg font-semibold">2. Fix any problems</h3>
+        <h3 className="text-lg font-semibold">3. Fix any problems</h3>
+        {chosen === 'add' && errors.some((i) => /already in your current setup/.test(i.message)) && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <span className="flex-1">
+              {errors.filter((i) => /already in your current setup/.test(i.message)).length} records in the file already exist. Adding never
+              overwrites them; choose another way to import instead:
+            </span>
+            <Button variant="secondary" onClick={() => setMode('update')}>
+              Update & add
+            </Button>
+            <Button variant="secondary" onClick={() => setMode('replace')}>
+              Replace setup
+            </Button>
+          </div>
+        )}
         {errors.length ? (
           <p className="text-sm text-red-700">
             {errors.length} error{errors.length === 1 ? '' : 's'} must be fixed before importing: correct the file and re-upload it (a file
@@ -312,33 +378,6 @@ export default function ImportData({ college, onContinue, onManual }) {
       </div>
 
       <Card className="space-y-3">
-        <h3 className="text-lg font-semibold">3. Import</h3>
-        {empty ? (
-          <p className="text-sm text-slate-600">The setup is empty, so the imported data becomes the college setup.</p>
-        ) : (
-          <fieldset className="grid gap-2 sm:grid-cols-2">
-            {[
-              ['add', 'Add to the current setup', 'Keeps everything already set up and adds the new records. A record that already exists is reported as an error, never overwritten. The time structure is not changed.'],
-              ['replace', 'Replace the current setup', 'Removes the current departments, rooms, subjects, teachers and sections and uses the file instead (records with the same name keep their identity). Asks for confirmation.'],
-            ].map(([value, title, text]) => (
-              <label
-                key={value}
-                className={`flex cursor-pointer gap-2 rounded-xl border p-3 text-sm ${
-                  mode === value ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'
-                }`}
-              >
-                <input type="radio" name="import-mode" checked={mode === value} onChange={() => setMode(value)} className="mt-1" />
-                <span>
-                  <b className="text-slate-900">
-                    {title}
-                    {value === 'add' ? ' (safest)' : ''}
-                  </b>
-                  <span className="block text-slate-600">{text}</span>
-                </span>
-              </label>
-            ))}
-          </fieldset>
-        )}
         <p className="text-sm text-slate-700">
           {result.ok ? (
             <>

@@ -1,34 +1,35 @@
 ﻿name,capacity,type,department,facilities,events_only
-A-101,66,classroom,CSE,"Projector;Smart board",no
-A-102,66,classroom,CSE,Projector,no
-A-103,66,classroom,CSE,Projector,no
-A-104,66,classroom,CSE,"Projector;Smart board",no
-A-201,66,classroom,IT,Projector,no
-A-202,66,classroom,IT,"Projector;Smart board",no
-B-101,66,classroom,ECE,Projector,no
-B-102,66,classroom,ECE,Projector,no
-B-103,66,classroom,ECE,"Projector;Smart board",no
-C-101,66,classroom,ME,Projector,no
-C-102,66,classroom,ME,Projector,no
-Lecture Theatre LT-1,120,classroom,,"Projector;Sound system;Smart board",no
-Lecture Theatre LT-2,120,classroom,,"Projector;Sound system",no
-Tutorial Room T-1,40,gym,,Whiteboard,no
-Programming Lab 1,36,lab,CSE,"Computers;Projector",no
-Programming Lab 2,thirty-six,lab,CSE,"Computers;Projector",no
-Systems Lab,36,lab,CSE,Computers,no
-Networks Lab,36,lab,CSE,"Computers;Network rack",no
-Web Technologies Lab,36,lab,IT,"Computers;Projector",no
-Database Lab,36,lab,IT,Computers,no
-Electronic Devices Lab,32,lab,ECE,"Oscilloscopes;Function generators",no
-Digital Electronics Lab,32,lab,ECE,"Trainer kits;Oscilloscopes",no
-Microprocessor Lab,32,lab,ECE,"Computers;Trainer kits",no
-Communication Lab,32,lab,ECE,"Signal generators;Spectrum analyser",no
-Strength of Materials Lab,36,lab,ME,Universal testing machine,no
-Manufacturing Workshop,40,lab,ME,"Lathes;Milling machine;CNC machine",no
-Drawing Hall,40,lab,ME,Drafting tables,no
-Thermal & Heat Transfer Lab,36,lab,ME,Heat exchangers,no
-Fluid Mechanics Lab,36,lab,ME,"Flow bench;Pumps",no
-Main Seminar Hall,180,seminar,,"Projector;Sound system;Stage;Video recording",yes
-Conference Room,30,seminar,,"Projector;Video conferencing",yes
-Auditorium,450,seminar,,"Projector;Sound system;Stage;Lighting",yes
-A-101,70,classroom,CSE,,no
+A-101,66,Classroom,CSE,"Projector;Smart board",no
+A-102,66,Classroom,CSE,Projector,no
+A-103,66,Classroom,CSE,Projector,no
+A-104,66,Classroom,CSE,"Projector;Smart board",no
+A-201,66,Classroom,IT,Projector,no
+A-202,66,Classroom,IT,"Projector;Smart board",no
+B-101,66,Classroom,ECE,Projector,no
+B-102,66,Classroom,ECE,Projector,no
+B-103,66,Classroom,ECE,"Projector;Smart board",no
+C-101,66,Classroom,ME,Projector,no
+C-102,66,Classroom,ME,Projector,no
+Lecture Theatre LT-1,120,Lecture theatre,,"Projector;Sound system;Smart board",no
+Lecture Theatre LT-2,120,Lecture theatre,,"Projector;Sound system",no
+Tutorial Room T-1,40,,,Whiteboard,no
+Tutorial Room T-2,40,Tutorial room,,Whiteboard,no
+Programming Lab 1,36,Computer lab,CSE,"Computers;Projector",no
+Programming Lab 2,thirty-six,Computer lab,CSE,"Computers;Projector",no
+Systems Lab,36,Computer lab,CSE,Computers,no
+Networks Lab,36,Computer lab,CSE,"Computers;Network rack",no
+Web Technologies Lab,36,Computer lab,IT,"Computers;Projector",no
+Database Lab,36,Computer lab,IT,Computers,no
+Electronic Devices Lab,32,Electronics lab,ECE,"Oscilloscopes;Function generators",no
+Digital Electronics Lab,32,Electronics lab,ECE,"Trainer kits;Oscilloscopes",no
+Microprocessor Lab,32,Electronics lab,ECE,"Computers;Trainer kits",no
+Communication Lab,32,Electronics lab,ECE,"Signal generators;Spectrum analyser",no
+Strength of Materials Lab,36,Mechanical lab,ME,Universal testing machine,no
+Thermal & Heat Transfer Lab,36,Mechanical lab,ME,Heat exchangers,no
+Fluid Mechanics Lab,36,Mechanical lab,ME,"Flow bench;Pumps",no
+Manufacturing Workshop,40,Workshop,ME,"Lathes;Milling machine;CNC machine",no
+Drawing Hall,40,Drawing hall,ME,Drafting tables,no
+Main Seminar Hall,180,Seminar hall,,"Projector;Sound system;Stage;Video recording",yes
+Conference Room,30,Seminar hall,,"Projector;Video conferencing",yes
+Auditorium,450,Seminar hall,,"Projector;Sound system;Stage;Lighting",yes
+A-101,70,Classroom,CSE,,no

@@ -1,7 +1,8 @@
 ﻿setting,value
 days,"Mon;Tue;Wed;Thu;Fri;Sat"
 periods_per_day,7
-break_after,4
 start_time,09:00
 period_minutes,55
-break_minutes,40
+breaks,"2:10:Tea break;4:40:Lunch"
+day_periods,Sat:4
+blocked,"Mon-1:Assembly;Wed-7:Sports"
