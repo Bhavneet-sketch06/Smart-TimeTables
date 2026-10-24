@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { CheckCircle2, Printer, XCircle } from 'lucide-react'
-import { ROOM_TYPE_LABELS, formatDate, timeRange, toHHMM, windowOf } from '../../booking.js'
+import { formatDate, timeRange, toHHMM, windowOf } from '../../booking.js'
+import { roomTypeName } from '../../data/schema.js'
 import { Button } from '../../components/ui.jsx'
 
 /** Prints only this element: everything else is hidden by the `printing-one` rules in index.css. */
@@ -69,7 +70,7 @@ export default function BookingReceipt({ booking, data }) {
           ) : null}
         </Row>
         <Row label="Room">
-          {room ? `${room.name} · ${ROOM_TYPE_LABELS[room.type] ?? room.type} · ${room.capacity} seats` : 'Room no longer exists'}
+          {room ? `${room.name} · ${roomTypeName(data, room.type)} · ${room.capacity} seats` : 'Room no longer exists'}
         </Row>
         <Row label="Attendance">{booking.attendance} people</Row>
         {booking.facilities?.length > 0 && <Row label="Equipment">{booking.facilities.join(', ')}</Row>}

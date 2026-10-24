@@ -7,12 +7,17 @@
  *             blocked?: { 'Wed-6': 'Sports' } }        college-wide slots with no classes (assembly, sports, ...)
  *           days may be any of Mon..Sun, in the college's week order. Older data has a single break
  *           (breakAfter / breakMinutes); breaksOf() reads both and normalizeTime() upgrades it.
- * rooms:    { id, name, capacity, type: 'classroom' | 'lab' | 'seminar', facilities?: string[], eventsOnly?: boolean }
+ * roomTypes: [{ id, name, kind: 'lecture' | 'lab' }]   the college's room types (defaults: classroom, lab, seminar)
+ *           kind says what a type is for: 'lecture' rooms hold lectures and tutorials, 'lab' rooms hold labs
+ * rooms:    { id, name, capacity, type: roomTypes id, facilities?: string[], eventsOnly?: boolean }
  *           eventsOnly rooms are never used for regular classes, only for Book a Space bookings
  * teachers: { id, name, department, subjectIds: string[], maxHours, unavailable: string[] }
  *           unavailable slot keys look like "Mon-1" (1-based period)
- * subjects: { id, name, code, lectureHours, labHours }
+ * subjects: { id, name, code, lectureHours, labHours,
+ *             lectureRoomType?, lectureNeeds?: string[], labRoomType?, labNeeds?: string[] }
  *           labHours = length of one lab block in consecutive periods (0 = no lab)
+ *           *RoomType = the room type a class needs (default: any room of the right kind);
+ *           *Needs = facilities the room must have (e.g. ['Computers'])
  * sections: { id, name, department, students, assignments: { subjectId, teacherId }[] }
  * timetable: null | { entries, stats, generatedAt }
  * meta:     null | { name, note }   where the data came from (shown in the UI)
@@ -25,6 +30,26 @@
 export const STORAGE_KEY = 'ttgen:v1'
 
 export const ROOM_TYPES = ['classroom', 'lab', 'seminar']
+export const DEFAULT_ROOM_TYPES = [
+  { id: 'classroom', name: 'Classroom', kind: 'lecture' },
+  { id: 'lab', name: 'Lab', kind: 'lab' },
+  { id: 'seminar', name: 'Seminar hall', kind: 'lecture' },
+]
+export const ROOM_KINDS = { lecture: 'Lectures & tutorials', lab: 'Labs & practicals' }
+
+/** A sensible kind for a room type known only by name, e.g. "Computer lab" or "Drawing hall" hold labs. */
+export const guessKind = (name) => (/lab|workshop|studio|practical|drawing|clinic|kitchen/i.test(name) ? 'lab' : 'lecture')
+
+/** The college's room types: its own list (or the defaults), plus any type a room uses that isn't listed. */
+export function roomTypesOf(data) {
+  const list = data.roomTypes?.length ? [...data.roomTypes] : [...DEFAULT_ROOM_TYPES]
+  for (const r of data.rooms ?? []) {
+    if (r.type && !list.some((t) => t.id === r.type)) list.push({ id: r.type, name: r.type, kind: guessKind(r.type) })
+  }
+  return list
+}
+
+export const roomTypeName = (data, id) => roomTypesOf(data).find((t) => t.id === id)?.name ?? id ?? ''
 
 export const ALL_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 export const DAY_NAMES = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' }

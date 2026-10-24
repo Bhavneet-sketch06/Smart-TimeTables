@@ -15,7 +15,7 @@
 //   testChange actually generated one.
 
 import { ALL_DAYS, DAY_NAMES, blocksPerWeek, breaksOf, longestBlockOf, openPeriodsOf, uid } from './data/schema.js'
-import { generateTimetable, labGroupsOf, labSessionsOf, precheck, roomFits } from './scheduler.js'
+import { MAX_LAB_GROUPS, describeNeed, generateTimetable, labGroupsOf, labSessionsOf, needOf, precheck, roomMatcher } from './scheduler.js'
 
 const plural = (n, word, many = `${word}s`) => `${n} ${n === 1 ? word : many}`
 const find = (list, id) => list.find((x) => x.id === id)
@@ -130,11 +130,15 @@ function reassignRemedies(data, sectionId, subjectId, role, { exclude, limit = 2
     })
 }
 
-/** Ways to get a room of the right type that seats `students`: allow an events-only room, enlarge one, or add one. */
-function roomRemedies(data, kind, students, departmentId, { count = 1 } = {}) {
+/**
+ * Ways to get a room that matches a class (kind, required type and facilities) and seats `students`: allow an
+ * events-only room, enlarge one, or add one.
+ */
+function roomRemedies(data, kind, students, departmentId, { count = 1, need = {} } = {}) {
   const lab = kind === 'lab'
-  const typeOk = (r) => (lab ? r.type === 'lab' : r.type === 'classroom' || r.type === 'seminar')
-  const word = lab ? 'lab' : 'classroom'
+  const fits = roomMatcher(data)
+  const typeOk = (r) => fits({ ...r, eventsOnly: false }, kind, 0, need)
+  const word = describeNeed(data, kind, { type: need.type }).slice(2)
   const out = []
   const any = data.rooms.some((r) => !r.eventsOnly && typeOk(r))
   const eventsOnly = data.rooms.filter((r) => r.eventsOnly && typeOk(r) && r.capacity >= students)
@@ -162,12 +166,14 @@ function roomRemedies(data, kind, students, departmentId, { count = 1 } = {}) {
     id: uid('room'),
     name: `New ${word} (${students} seats)`,
     capacity: students,
-    type: lab ? 'lab' : 'classroom',
+    type: need.type || (lab ? 'lab' : 'classroom'),
+    facilities: [...(need.needs ?? [])],
     deptId: departmentId ?? null,
   })
+  const extras = need.needs?.length ? ` and ${need.needs.join(', ')}` : ''
   out.push({
     id: `add-${word}-${students}-${count}`,
-    text: `Add ${count === 1 ? `${any ? 'another' : 'a'} ${word}` : `${count} more ${word}s`} with at least ${students} seats.`,
+    text: `Add ${count === 1 ? `${any ? 'another' : 'a'} ${word}` : `${count} more ${word}s`} with at least ${students} seats${extras}.`,
     where: WHERE.rooms,
     change: count === 1 ? { type: 'addRoom', room: newRoom() } : { type: 'many', changes: Array.from({ length: count }, () => ({ type: 'addRoom', room: newRoom() })) },
   })
@@ -229,10 +235,14 @@ const RANK = {
   'not-qualified': 1,
   'no-lecture-room': 2,
   'no-lab-room': 2,
+  'room-requirement': 2,
   'lab-too-long': 2,
   'week-overflow': 3,
   'teacher-availability': 4,
   'teacher-max': 5,
+  'teacher-daily': 5,
+  'section-daily': 4,
+  'lecture-block-too-long': 2,
   'lecture-rooms': 6,
   'lab-rooms': 6,
   'lab-blocks': 6,
@@ -329,18 +339,21 @@ function issueDiagnosis(data, issue, departmentId) {
     case 'no-lab-room':
     case 'no-lecture-room': {
       const lab = issue.kind === 'no-lab-room'
-      const biggest = Math.max(0, ...data.rooms.filter((r) => !r.eventsOnly && (lab ? r.type === 'lab' : r.type !== 'lab')).map((r) => r.capacity))
-      const word = lab ? 'lab' : 'classroom'
-      d.title = biggest ? `No ${word} is big enough for ${sec?.name}` : `There are no ${word}s for regular classes`
+      const kind = lab ? 'lab' : 'lecture'
+      const need = sub ? needOf(sub, kind) : {}
+      const fits = roomMatcher(data)
+      const biggest = Math.max(0, ...data.rooms.filter((r) => fits(r, kind, 0, need)).map((r) => r.capacity))
+      const word = describeNeed(data, kind, need).slice(2)
+      d.title = biggest ? `No ${word} is big enough for ${sec?.name}` : `There are no ${lab ? 'labs' : 'classrooms'} for regular classes`
       d.facts.push(
         biggest
           ? `${lab && issue.groups > 1 ? `Each lab group has ${issue.students}` : `It has ${issue.students}`} students; the biggest ${word} that takes classes seats ${biggest}.`
-          : `No room of type "${lab ? 'lab' : 'classroom or seminar'}" is available for classes.`,
+          : `No room of a ${lab ? 'lab' : 'classroom'} type is available for classes.`,
       )
-      d.remedies.push(...roomRemedies(data, lab ? 'lab' : 'lecture', issue.students, departmentId))
+      d.remedies.push(...roomRemedies(data, kind, issue.students, departmentId, { need }))
       if (lab && biggest > 0 && sec) {
         const groups = Math.ceil(sec.students / biggest)
-        if (groups > labGroupsOf(sec) && groups <= 4) {
+        if (groups > labGroupsOf(sec) && groups <= MAX_LAB_GROUPS) {
           d.remedies.push({
             id: `groups-${sec.id}-${groups}`,
             text: `Split ${sec.name} into ${groups} lab groups of about ${Math.ceil(sec.students / groups)} students (each group then needs its own lab session).`,
@@ -349,6 +362,38 @@ function issueDiagnosis(data, issue, departmentId) {
           })
         }
       }
+      break
+    }
+    case 'room-requirement': {
+      const kind = issue.role === 'lab' ? 'lab' : 'lecture'
+      const need = needOf(sub, kind)
+      const fits = roomMatcher(data)
+      d.title = `No room matches what ${sub?.name} ${kind === 'lab' ? 'labs' : 'lectures'} need`
+      // Rooms of the right type that only lack some of the facilities.
+      const ofType = data.rooms.filter((r) => fits(r, kind, 0, { type: need.type }))
+      const missing = (r) => need.needs.filter((f) => !(r.facilities ?? []).some((x) => x.toLowerCase() === f.toLowerCase()))
+      d.facts.push(
+        ofType.length
+          ? `${ofType.length} room(s) are the right type, but none has ${need.needs.join(' and ')}.`
+          : `No room that takes classes is ${describeNeed(data, kind, { type: need.type })}.`,
+      )
+      const closest = [...ofType].sort((a, b) => missing(a).length - missing(b).length)[0]
+      if (closest) {
+        d.remedies.push({
+          id: `facilities-${closest.id}`,
+          text: `If ${closest.name} has ${missing(closest).join(' and ')}, add ${missing(closest).length === 1 ? 'it' : 'them'} to its facilities.`,
+          where: WHERE.rooms,
+          change: { type: 'room', id: closest.id, patch: { facilities: [...(closest.facilities ?? []), ...missing(closest)] } },
+        })
+      }
+      d.remedies.push(...roomRemedies(data, kind, issue.students, departmentId, { need }).filter((r) => r.change?.type === 'addRoom'))
+      const field = kind === 'lab' ? { labRoomType: null, labNeeds: [] } : { lectureRoomType: null, lectureNeeds: [] }
+      d.remedies.push({
+        id: `relax-${sub?.id}-${kind}`,
+        text: `Or drop the requirement, so ${sub?.name} ${kind === 'lab' ? 'labs' : 'lectures'} can use any ${kind === 'lab' ? 'lab' : 'classroom'}.`,
+        where: WHERE.subjects,
+        change: sub && { type: 'subject', id: sub.id, patch: field },
+      })
       break
     }
     case 'week-overflow': {
@@ -376,6 +421,43 @@ function issueDiagnosis(data, issue, departmentId) {
         })
       }
       d.remedies.push(...moveSomeClasses(data, issue.teacherId, need))
+      break
+    }
+    case 'lecture-block-too-long': {
+      d.title = `${sub?.name} lecture blocks are longer than any stretch between breaks`
+      d.facts.push(`Lectures are set to run ${issue.block} periods in a row; the longest stretch is ${plural(issue.longestBlock, 'period')}.`)
+      d.remedies.push({
+        id: `block-${sub?.id}`,
+        text: `Use blocks of ${issue.longestBlock > 1 ? issue.longestBlock : 1} period${issue.longestBlock > 1 ? 's' : ''} for ${sub?.name} lectures instead.`,
+        where: WHERE.subjects,
+        change: sub && { type: 'subject', id: sub.id, patch: { lectureBlock: Math.max(1, issue.longestBlock) } },
+      })
+      const move = bestBreakMove(data.time, (t) => Math.min(longestBlockOf(t), issue.block))
+      if (move) {
+        d.remedies.push({
+          id: `break-${move.from}-${move.to}`,
+          text: `Move the ${move.label.toLowerCase()} from after period ${move.from} to after period ${move.to}, so ${issue.block} periods in a row fit (changes the day for every department).`,
+          where: WHERE.time,
+          change: move.change,
+        })
+      }
+      break
+    }
+    case 'teacher-daily':
+    case 'section-daily': {
+      const isTeacher = issue.kind === 'teacher-daily'
+      const who = isTeacher ? teacher : sec
+      const needed = Math.ceil(issue[isTeacher ? 'load' : 'hours'] / issue.days)
+      d.title = `${who?.name}'s daily limit is too low for their week`
+      d.facts.push(`${issue[isTeacher ? 'load' : 'hours']} periods over ${issue.days} days need at least ${needed} a day; the limit is ${issue.max}.`)
+      d.remedies.push({
+        id: `daily-${who?.id}`,
+        text: `Raise ${who?.name}'s most periods a day from ${issue.max} to ${needed} (a little more gives the generator room to spread classes).`,
+        where: isTeacher ? WHERE.teachers : WHERE.sections,
+        change: who && { type: isTeacher ? 'teacher' : 'section', id: who.id, patch: { maxPerDay: needed } },
+      })
+      if (isTeacher) d.remedies.push(...moveSomeClasses(data, issue.teacherId, issue.load - issue.max * issue.days))
+      else d.remedies.push(...timeRemedies(data).slice(1))
       break
     }
     case 'teacher-max': {
@@ -410,7 +492,8 @@ function issueDiagnosis(data, issue, departmentId) {
       d.facts.push(
         `${issue.needed} lab sessions of ${len} periods need a slot; ${plural(issue.rooms, 'lab')} × ${issue.perWeek} blocks a week each = ${issue.capacity}.`,
       )
-      d.remedies.push(...roomRemedies(data, 'lab', labRoomSize(data, departmentId), departmentId, { count: extra }))
+      const need = { type: issue.type || null, needs: issue.needs ? issue.needs.split(';') : [] }
+      d.remedies.push(...roomRemedies(data, 'lab', labRoomSize(data, departmentId), departmentId, { count: extra, need }))
       // A different break position may fit more whole blocks a week.
       const move = bestBreakMove(data.time, (t) => blocksPerWeek(t, len))
       if (move) {
@@ -477,8 +560,9 @@ function searchDiagnosis(data, run, departmentId, fixedEntries) {
   const teacher = find(data.teachers, u.teacherId)
   if (!sec || !sub || !teacher) return null
   const lab = u.kind === 'lab'
+  const kindLabel = u.kind === 'lecture' ? (u.length > 1 ? ' double lecture' : '') : ` ${u.kind}`
   const who = `${sec.name}${u.group ? ` (group ${u.group})` : ''}`
-  const what = `${sub.name}${lab ? ' lab' : ''} for ${who}`
+  const what = `${sub.name}${kindLabel} for ${who}`
   const { days, periodsPerDay: P } = data.time
   const S = openPeriodsOf(data.time)
 
@@ -486,6 +570,7 @@ function searchDiagnosis(data, run, departmentId, fixedEntries) {
     { key: 'teacher', n: f.teacherBusy, text: `${teacher.name} was already teaching` },
     { key: 'section', n: f.sectionBusy, text: `${who} already had another class` },
     { key: 'rooms', n: f.roomsBusy, text: `every suitable ${lab ? 'lab' : 'room'} was taken` },
+    { key: 'daily', n: f.dailyLimit ?? 0, text: 'a daily limit (most periods a day) was already reached' },
   ]
     .filter((b) => b.n > 0)
     .sort((a, b) => b.n - a.n)
@@ -499,21 +584,23 @@ function searchDiagnosis(data, run, departmentId, fixedEntries) {
     facts: [],
     remedies: [],
   }
-  const need = lab ? `a ${u.length}-period block` : 'one period'
-  const roomNeed = `${lab ? 'a lab' : 'a classroom'} for ${u.students} students`
+  const need = needOf(sub, u.kind)
+  const span = lab ? `a ${u.length}-period block` : u.length > 1 ? `${u.length} consecutive periods` : 'one period'
+  const roomNeed = `${describeNeed(data, u.kind, need)} for ${u.students} students`
 
   if (f.noCandidates) {
-    d.cause = `${what} needs ${need} with ${teacher.name} and ${roomNeed}, but ${teacher.name} is marked unavailable at every time such a block fits.`
+    d.cause = `${what} needs ${span} with ${teacher.name} and ${roomNeed}, but ${teacher.name} is marked unavailable at every time such a block fits.`
   } else {
     const parts = blockers.map((b) => `${b.n} because ${b.text}`)
     if (f.open) parts.push(`${f.open} ${f.open === 1 ? 'was' : 'were'} still free`)
     d.cause =
-      `In the best attempt, ${plural(f.unplacedCount, 'class', 'classes')} stayed unplaced. The hardest was ${what}, which needs ${need} ` +
+      `In the best attempt, ${plural(f.unplacedCount, 'class', 'classes')} stayed unplaced. The hardest was ${what}, which needs ${span} ` +
       `with ${teacher.name} and ${roomNeed}. Of its ${f.slots} possible start times: ${list(parts)}.`
   }
 
   // Facts about the resources involved (counted from the setup and the timetable as generated).
-  const eligible = data.rooms.filter((r) => roomFits(r, u.kind, u.students))
+  const fits = roomMatcher(data)
+  const eligible = data.rooms.filter((r) => fits(r, u.kind, u.students, need))
   d.facts.push(
     eligible.length
       ? `${plural(eligible.length, lab ? 'lab' : 'room')} can take it: ${list(eligible.slice(0, 4).map((r) => r.name))}${eligible.length > 4 ? ' and others' : ''}.`
@@ -555,11 +642,22 @@ function searchDiagnosis(data, run, departmentId, fixedEntries) {
       }
     },
     section: () => d.remedies.push(...timeRemedies(data, { periodsNeeded: u.length })),
-    rooms: () => d.remedies.push(...roomRemedies(data, u.kind, u.students, departmentId)),
+    rooms: () => d.remedies.push(...roomRemedies(data, u.kind, u.students, departmentId, { need })),
+    daily: () => {
+      for (const [who, type, where] of [[teacher, 'teacher', WHERE.teachers], [sec, 'section', WHERE.sections]]) {
+        if (!(who.maxPerDay > 0)) continue
+        d.remedies.push({
+          id: `daily-${who.id}`,
+          text: `Raise ${who.name}'s most periods a day from ${who.maxPerDay} to ${who.maxPerDay + 1}.`,
+          where,
+          change: { type, id: who.id, patch: { maxPerDay: who.maxPerDay + 1 } },
+        })
+      }
+    },
   }
   if (f.noCandidates) add.teacher()
   for (const b of blockers) add[b.key]()
-  if (!d.remedies.length) d.remedies.push(...roomRemedies(data, u.kind, u.students, departmentId), ...timeRemedies(data))
+  if (!d.remedies.length) d.remedies.push(...roomRemedies(data, u.kind, u.students, departmentId, { need }), ...timeRemedies(data))
   return d
 }
 

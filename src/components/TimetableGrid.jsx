@@ -53,7 +53,10 @@ function ClassCard({ e, mode, lk, compact = false }) {
   const sub = lk.subjects.get(e.subjectId)
   const c = lk.color(e.subjectId)
   const lines = detailLines(e, mode, lk)
-  const labLabel = `Lab${mode === 'section' && e.group ? ` ${e.group}` : ''}`
+  // Labs and tutorials get a chip (with the group, on a section's timetable); lectures don't.
+  const chip = e.kind === 'lab' || e.kind === 'tutorial'
+  const KindIcon = e.kind === 'lab' ? FlaskConical : UsersRound
+  const labLabel = `${e.kind === 'lab' ? 'Lab' : 'Tutorial'}${mode === 'section' && e.group ? ` ${e.group}` : ''}`
   return (
     <div
       className={`relative flex h-full flex-col overflow-hidden rounded-xl border shadow-sm ${c.card} ${
@@ -61,16 +64,16 @@ function ClassCard({ e, mode, lk, compact = false }) {
       }`}
     >
       <span className={`absolute inset-y-0 left-0 w-1.5 ${c.bar}`} />
-      {compact && e.kind === 'lab' && (
+      {compact && chip && (
         <span className={`mb-1 inline-flex w-fit items-center gap-1 rounded-full px-1.5 text-xs font-bold ${c.chip}`}>
-          <FlaskConical className="h-3 w-3" /> {labLabel}
+          <KindIcon className="h-3 w-3" /> {labLabel}
         </span>
       )}
       <div className="flex items-start justify-between gap-1.5">
         <span className="font-semibold leading-snug hyphens-auto break-words">{sub?.name ?? '?'}</span>
-        {!compact && e.kind === 'lab' && (
+        {!compact && chip && (
           <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ${c.chip}`}>
-            <FlaskConical className="h-3.5 w-3.5" /> {labLabel}
+            <KindIcon className="h-3.5 w-3.5" /> {labLabel}
           </span>
         )}
       </div>

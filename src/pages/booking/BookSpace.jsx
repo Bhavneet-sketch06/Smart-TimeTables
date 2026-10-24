@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { AlertTriangle, ArrowLeft, ArrowRight, CalendarPlus, Check, Clock, Info, MapPin, UsersRound } from 'lucide-react'
 import {
   EVENT_TYPES,
-  ROOM_TYPE_LABELS,
   createBooking,
   findSpaces,
   formatDate,
@@ -15,7 +14,7 @@ import {
   weekdayOf,
   windowOf,
 } from '../../booking.js'
-import { departmentsOf, periodTimes } from '../../data/schema.js'
+import { departmentsOf, periodTimes, roomTypeName, roomTypesOf } from '../../data/schema.js'
 import { deptById } from '../../data/departments.js'
 import { Button, Card, Field, Select } from '../../components/ui.jsx'
 import BookingReceipt from './BookingReceipt.jsx'
@@ -265,7 +264,7 @@ export default function BookSpace({ college, organizer, createdBy, deptId, onVie
                 label="Room type"
                 value={req.roomType}
                 options={[{ value: 'any', label: 'Any room type' }].concat(
-                  Object.entries(ROOM_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+                  roomTypesOf(data).map((t) => ({ value: t.id, label: t.name })),
                 )}
                 onChange={(e) => set({ roomType: e.target.value })}
               />
@@ -383,7 +382,7 @@ export default function BookSpace({ college, organizer, createdBy, deptId, onVie
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <div className="font-semibold text-slate-900">{r.name}</div>
-                          <div className="text-sm text-slate-500">{ROOM_TYPE_LABELS[r.type] ?? r.type}</div>
+                          <div className="text-sm text-slate-500">{roomTypeName(data, r.type)}</div>
                         </div>
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">
                           <Check className="h-3 w-3" /> Available
@@ -479,7 +478,7 @@ export default function BookSpace({ college, organizer, createdBy, deptId, onVie
                   'Time',
                   `${timeRange(req)}${req.setup || req.cleanup ? ` (room held ${toHHMM(held.from)}–${toHHMM(held.to)})` : ''}`,
                 ],
-                ['Room', `${room.name} · ${ROOM_TYPE_LABELS[room.type] ?? room.type} · ${room.capacity} seats`],
+                ['Room', `${room.name} · ${roomTypeName(data, room.type)} · ${room.capacity} seats`],
                 ['Attendance', `${req.attendance} people`],
                 ...(req.facilities.length ? [['Equipment', req.facilities.join(', ')]] : []),
                 ...(req.notes.trim() ? [['Notes', req.notes.trim()]] : []),

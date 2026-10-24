@@ -62,7 +62,7 @@ export default function StepTeachers({ data, update, deptId = ALL }) {
       {shown.length === 0 && <EmptyState>No teachers{dept ? ` in ${dept.short}` : ''} yet.</EmptyState>}
       {shown.map((t) => (
         <div key={t.id} className="space-y-3 rounded-lg border border-slate-200 p-3">
-          <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[2fr_1fr_1fr_auto]">
+          <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
             <Field label="Name" value={t.name} onChange={(e) => patch(t.id, { name: e.target.value })} className="col-span-2 sm:col-span-1" />
             <Select
               label="Home department"
@@ -76,6 +76,14 @@ export default function StepTeachers({ data, update, deptId = ALL }) {
               }}
             />
             <Field label="Max hours / week" type="number" min={1} value={t.maxHours} onChange={(e) => patch(t.id, { maxHours: toNumber(e.target.value, 1) })} />
+            <Field
+              label="Most periods / day"
+              type="number"
+              min={0}
+              placeholder="no limit"
+              value={t.maxPerDay || ''}
+              onChange={(e) => patch(t.id, { maxPerDay: toNumber(e.target.value) || undefined })}
+            />
             <Button variant="danger" onClick={() => remove(t.id)}>
               Remove
             </Button>

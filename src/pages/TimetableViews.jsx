@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ROOM_TYPE_LABELS } from '../booking.js'
+import { roomTypeName } from '../data/schema.js'
 import { ALL, batchOf, deptById, sectionsOf, teachersOf } from '../data/departments.js'
 import { Card, EmptyState, Select } from '../components/ui.jsx'
 import TimetableSheet from '../components/TimetableSheet.jsx'
@@ -68,7 +68,7 @@ export default function TimetableViews({ data, deptId = ALL, canManage = false, 
         ? `${item?.department || 'Faculty'} · weekly teaching schedule${
             otherDepts.length ? ` (includes classes in ${otherDepts.map(deptName).join(', ')})` : ''
           }`
-        : `${ROOM_TYPE_LABELS[item?.type] ?? ''} · ${item?.capacity ?? '?'} seats · ${
+        : `${roomTypeName(data, item?.type)} · ${item?.capacity ?? '?'} seats · ${
             item?.deptId ? `${deptName(item.deptId)} room` : 'shared room'
           } · classes from every department`
 

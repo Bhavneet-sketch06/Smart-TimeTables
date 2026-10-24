@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CalendarCheck, CalendarDays, CircleCheck, Coffee, FlaskConical, MapPin, Moon, UserRound } from 'lucide-react'
+import { CalendarCheck, CalendarDays, CircleCheck, Coffee, FlaskConical, MapPin, Moon, UserRound, UsersRound } from 'lucide-react'
 import { DAY_NAMES, makeLookup } from '../components/TimetableGrid.jsx'
 import { planDay, untilText } from '../myDay.js'
 import { Button } from '../components/ui.jsx'
@@ -33,10 +33,12 @@ function Details({ c, lk, light = false }) {
 }
 
 function LabChip({ e, className = '' }) {
-  if (e.kind !== 'lab') return null
+  if (e.kind !== 'lab' && e.kind !== 'tutorial') return null
+  const Icon = e.kind === 'lab' ? FlaskConical : UsersRound
   return (
     <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ${className}`}>
-      <FlaskConical className="h-3 w-3" /> Lab{e.group ? ` ${e.group}` : ''}
+      <Icon className="h-3 w-3" /> {e.kind === 'lab' ? 'Lab' : 'Tutorial'}
+      {e.group ? ` ${e.group}` : ''}
     </span>
   )
 }

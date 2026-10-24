@@ -5,10 +5,9 @@
 //            attendance, notes, facilities: string[], roomId, date: 'YYYY-MM-DD', start: 'HH:MM',
 //            duration (min), setup (min), cleanup (min), createdAt, createdBy: { role, teacherId? }, cancelledAt? }
 
-import { periodTimes } from './data/schema.js'
+import { periodTimes, roomTypeName } from './data/schema.js'
 
 export const EVENT_TYPES = ['Workshop', 'Seminar', 'Guest Lecture', 'Extra Class', 'Meeting', 'Other']
-export const ROOM_TYPE_LABELS = { classroom: 'Classroom', lab: 'Lab', seminar: 'Seminar hall' }
 export const OPEN_FROM = 7 * 60 // bookings allowed between 07:00 ...
 export const OPEN_UNTIL = 21 * 60 // ... and 21:00 (including buffers)
 
@@ -115,7 +114,7 @@ export function checkRoom(data, bookings, room, req, ignoreId) {
     reasons.push({ kind: 'capacity', text: `Only ${room.capacity} seats (needs ${req.attendance})` })
   }
   if (req.roomType && req.roomType !== 'any' && room.type !== req.roomType) {
-    reasons.push({ kind: 'type', text: `It is a ${ROOM_TYPE_LABELS[room.type]?.toLowerCase() ?? room.type}` })
+    reasons.push({ kind: 'type', text: `It is a ${roomTypeName(data, room.type).toLowerCase()}` })
   }
   const missing = (req.facilities || []).filter((f) => !(room.facilities || []).includes(f))
   if (missing.length) reasons.push({ kind: 'facilities', text: `No ${missing.join(', ').toLowerCase()}` })
@@ -158,7 +157,7 @@ export function suggestAlternatives(data, bookings, req, { limit = 4, now = new 
     const biggest = sameType.reduce((a, r) => (r.capacity > (a?.capacity ?? 0) ? r : a), null)
     const parts = []
     if (biggest && biggest.capacity < Number(req.attendance)) {
-      parts.push(`the largest ${req.roomType && req.roomType !== 'any' ? ROOM_TYPE_LABELS[req.roomType].toLowerCase() : 'room'} (${biggest.name}) seats ${biggest.capacity}`)
+      parts.push(`the largest ${req.roomType && req.roomType !== 'any' ? roomTypeName(data, req.roomType).toLowerCase() : 'room'} (${biggest.name}) seats ${biggest.capacity}`)
     }
     if (req.facilities?.length) parts.push(`check whether every room really needs ${req.facilities.join(', ').toLowerCase()}`)
     if (req.roomType && req.roomType !== 'any') parts.push('try "Any room type"')

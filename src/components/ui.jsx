@@ -19,10 +19,10 @@ export function Card({ className = '', ...props }) {
 
 export function Field({ label, className = '', ...props }) {
   return (
-    <label className={`flex flex-col gap-1 text-sm ${className}`}>
+    <label className={`flex min-w-0 flex-col gap-1 text-sm ${className}`}>
       {label && <span className="font-medium text-slate-600">{label}</span>}
       <input
-        className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 focus:border-indigo-500 focus:outline-none"
+        className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-2 py-1.5 focus:border-indigo-500 focus:outline-none"
         {...props}
       />
     </label>
@@ -31,10 +31,10 @@ export function Field({ label, className = '', ...props }) {
 
 export function Select({ label, options, className = '', ...props }) {
   return (
-    <label className={`flex flex-col gap-1 text-sm ${className}`}>
+    <label className={`flex min-w-0 flex-col gap-1 text-sm ${className}`}>
       {label && <span className="font-medium text-slate-600">{label}</span>}
       <select
-        className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 focus:border-indigo-500 focus:outline-none"
+        className="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-2 py-1.5 focus:border-indigo-500 focus:outline-none"
         {...props}
       >
         {options.map((o) => {

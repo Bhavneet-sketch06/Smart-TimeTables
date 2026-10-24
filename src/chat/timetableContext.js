@@ -1,4 +1,4 @@
-import { blockedOf, periodTimes, periodsOn } from '../data/schema.js'
+import { blockedOf, periodTimes, periodsOn, roomTypeName } from '../data/schema.js'
 import { formatDate, timeRange, upcomingBookings } from '../booking.js'
 
 /** Upcoming one-off room bookings (Book a Space), soonest first. */
@@ -49,7 +49,7 @@ export function buildTimetableContext(data) {
   lines.push('', 'ROOMS')
   for (const r of data.rooms) {
     const extras = [r.facilities?.length ? `facilities: ${r.facilities.join(', ')}` : '', r.eventsOnly ? 'events only, no regular classes' : '']
-    lines.push(`- ${r.name}: ${r.type}, ${r.capacity} seats${extras.filter(Boolean).map((x) => `; ${x}`).join('')}`)
+    lines.push(`- ${r.name}: ${roomTypeName(data, r.type)}, ${r.capacity} seats${extras.filter(Boolean).map((x) => `; ${x}`).join('')}`)
   }
 
   lines.push('', 'TEACHERS')

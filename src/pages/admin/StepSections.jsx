@@ -1,4 +1,5 @@
 import { uid } from '../../data/schema.js'
+import { MAX_LAB_GROUPS } from '../../scheduler.js'
 import { ALL, deptById, sectionsOf } from '../../data/departments.js'
 import { Button, EmptyState, Field, Select } from '../../components/ui.jsx'
 import { patchItem, removeItem, toNumber } from './listUtils.js'
@@ -40,7 +41,7 @@ export default function StepSections({ data, update, deptId = ALL }) {
       {shown.map((sec) => {
         const hours = sec.assignments.reduce((n, a) => {
           const s = subjectById.get(a.subjectId)
-          return n + (s ? s.lectureHours + s.labHours * (s.labHours ? s.labSessions || 1 : 0) : 0)
+          return n + (s ? s.lectureHours + (s.tutorialHours || 0) + s.labHours * (s.labHours ? s.labSessions || 1 : 0) : 0)
         }, 0)
         // The section's own department's subjects plus shared ones (e.g. Mathematics).
         const unused = data.subjects.filter(
@@ -48,7 +49,7 @@ export default function StepSections({ data, update, deptId = ALL }) {
         )
         return (
           <div key={sec.id} className="space-y-3 rounded-lg border border-slate-200 p-3">
-            <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+            <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto]">
               <Field label="Name" value={sec.name} onChange={(e) => patch(sec.id, { name: e.target.value })} className="col-span-2 sm:col-span-1" />
               <Field label="Semester / class" value={sec.batch ?? ''} placeholder="e.g. 3rd Sem (D2)" onChange={(e) => patch(sec.id, { batch: e.target.value })} />
               <Field label="Students" type="number" min={1} value={sec.students} onChange={(e) => patch(sec.id, { students: toNumber(e.target.value, 1) })} />
@@ -57,9 +58,17 @@ export default function StepSections({ data, update, deptId = ALL }) {
                 title="Split the section into this many groups for labs (e.g. 2 = A1/A2)"
                 type="number"
                 min={1}
-                max={4}
+                max={MAX_LAB_GROUPS}
                 value={sec.labGroups || 1}
-                onChange={(e) => patch(sec.id, { labGroups: Math.min(4, toNumber(e.target.value, 1)), groupNames: undefined })}
+                onChange={(e) => patch(sec.id, { labGroups: Math.min(MAX_LAB_GROUPS, toNumber(e.target.value, 1)), groupNames: undefined })}
+              />
+              <Field
+                label="Most periods / day"
+                type="number"
+                min={0}
+                placeholder="no limit"
+                value={sec.maxPerDay || ''}
+                onChange={(e) => patch(sec.id, { maxPerDay: toNumber(e.target.value) || undefined })}
               />
               <Button variant="danger" onClick={() => update('sections', (sections) => removeItem(sections, sec.id))}>
                 Remove
