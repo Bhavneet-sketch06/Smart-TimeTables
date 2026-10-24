@@ -5,7 +5,7 @@ import { precheck, generateTimetable, findClashes, scoreQuality } from './schedu
 
 describe('scheduler on demo college', () => {
   test('pre-check passes', () => {
-    expect(precheck(demoCollege())).toEqual({ ok: true, problems: [] })
+    expect(precheck(demoCollege())).toEqual({ ok: true, problems: [], issues: [] })
   })
 
   test.each([1, 2, 3, 42, 2024])('generates a complete, clash-free timetable (seed %i)', (seed) => {

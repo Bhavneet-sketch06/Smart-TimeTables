@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Building2, CalendarCog } from 'lucide-react'
 import { Button, Card } from '../../components/ui.jsx'
+import FailureGuidance from '../../components/FailureGuidance.jsx'
 import { generateCollege, generateTimetable, precheck } from '../../scheduler.js'
-import { ALL, deptById, mergeDepartmentTimetable, sectionsOf, subjectsOf, teachersOf } from '../../data/departments.js'
+import { ALL, deptById, fixedFor, mergeDepartmentTimetable, sectionsOf, subjectsOf, teachersOf } from '../../data/departments.js'
 import StepTime from './StepTime.jsx'
 import StepRooms from './StepRooms.jsx'
 import StepTeachers from './StepTeachers.jsx'
@@ -19,22 +20,23 @@ const STEPS = [
 
 /**
  * Generates one department around the classes every other department already has (shared rooms and teachers
- * stay clash-free). Returns { problems } when the department can't be scheduled, else { timetable }.
+ * stay clash-free). Returns { failures } when the inputs make it impossible, else { failures: [], timetable }.
+ * A failure is { deptId, run, fixedEntries } for FailureGuidance.
  */
 export function generateDepartment(data, deptId) {
-  const deptOf = new Map(data.sections.map((s) => [s.id, s.deptId]))
-  const fixed = (data.timetable?.entries ?? []).filter((e) => deptOf.get(e.sectionId) !== deptId)
+  const fixed = fixedFor(data, deptId)
   const check = precheck(data, { departmentId: deptId, fixedEntries: fixed })
-  if (!check.ok) return { problems: check.problems }
+  if (!check.ok) return { failures: [{ deptId, run: { ok: false, ...check }, fixedEntries: fixed }] }
   const result = generateTimetable(data, { departmentId: deptId, fixedEntries: fixed })
-  return { problems: [], timetable: mergeDepartmentTimetable(data, deptId, fixed, result) }
+  return { failures: [], timetable: mergeDepartmentTimetable(data, deptId, fixed, result) }
 }
 
-export default function AdminWizard({ college, deptId = ALL, onGenerated }) {
+export default function AdminWizard({ college, deptId = ALL, onGenerated, initialFailures = [] }) {
   const { data, update, loadDemo, loadGndec, reset, setTimetable } = college
   const [step, setStep] = useState(0)
   const [busy, setBusy] = useState('')
-  const [problems, setProblems] = useState([])
+  // Departments whose inputs make a timetable impossible: { deptId, run, fixedEntries }.
+  const [failures, setFailures] = useState(initialFailures)
   const { title, Component, shared } = STEPS[step]
   const last = step === STEPS.length - 1
   const dept = deptId === ALL ? null : deptById(data, deptId)
@@ -42,26 +44,31 @@ export default function AdminWizard({ college, deptId = ALL, onGenerated }) {
   // Yield to the browser so the "Generating" state paints before the synchronous search.
   const run = (label, work) => {
     setBusy(label)
-    setProblems([])
+    setFailures([])
     setTimeout(() => {
-      const problemsFound = work()
+      const found = work()
       setBusy('')
-      setProblems(problemsFound)
-      if (!problemsFound.length) onGenerated()
+      setFailures(found)
+      if (!found.length) onGenerated()
     }, 30)
   }
   const generateThis = () =>
     run('dept', () => {
       const r = generateDepartment(data, deptId)
       if (r.timetable) setTimetable(r.timetable)
-      return r.problems
+      return r.failures
     })
   const generateAll = () =>
     run('all', () => {
-      if (!data.sections.length) return precheck(data).problems
+      if (!data.sections.length) return [{ deptId: ALL, run: { ok: false, ...precheck(data) }, fixedEntries: [] }]
       const result = generateCollege(data)
       setTimetable({ ...result, generatedAt: new Date().toISOString() })
-      return result.problems
+      const byDept = Object.entries(result.byDept ?? {})
+      // Only impossible inputs keep you on Setup; an incomplete search is explained on the Timetable tab.
+      if (!byDept.length) return result.issues?.length ? [{ deptId: ALL, run: result, fixedEntries: [] }] : []
+      return byDept
+        .filter(([, r]) => r.issues?.length)
+        .map(([id, r]) => ({ deptId: id, run: r, fixedEntries: fixedFor(data, id, result.entries) }))
     })
 
   return (
@@ -72,15 +79,15 @@ export default function AdminWizard({ college, deptId = ALL, onGenerated }) {
           {data.meta && <p className="text-slate-500">Loaded: {data.meta.name}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => { loadGndec(); setProblems([]) }}>
+          <Button variant="secondary" onClick={() => { loadGndec(); setFailures([]) }}>
             Load GNDEC demo (CSE + sample departments)
           </Button>
-          <Button variant="secondary" onClick={() => { loadDemo(); setProblems([]) }}>
+          <Button variant="secondary" onClick={() => { loadDemo(); setFailures([]) }}>
             Load demo college
           </Button>
           <Button
             variant="danger"
-            onClick={() => window.confirm('Clear all college data?') && (reset(), setProblems([]), setStep(0))}
+            onClick={() => window.confirm('Clear all college data?') && (reset(), setFailures([]), setStep(0))}
           >
             Clear all
           </Button>
@@ -122,16 +129,20 @@ export default function AdminWizard({ college, deptId = ALL, onGenerated }) {
         <Component data={data} update={update} deptId={deptId} />
       </Card>
 
-      {problems.length > 0 && (
-        <Card className="border-red-200 bg-red-50">
-          <h3 className="font-semibold text-red-700">These inputs make a timetable impossible:</h3>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-red-700">
-            {problems.map((p) => (
-              <li key={p}>{p}</li>
-            ))}
-          </ul>
-        </Card>
-      )}
+      {failures.map((f) => (
+        <FailureGuidance
+          key={f.deptId}
+          data={data}
+          run={f.run}
+          deptId={f.deptId}
+          fixedEntries={f.fixedEntries}
+          heading={
+            failures.length > 1 || deptId === ALL
+              ? `${deptById(data, f.deptId)?.name ?? 'The college'}: these inputs make a timetable impossible`
+              : undefined
+          }
+        />
+      ))}
 
       <div className="flex flex-wrap justify-between gap-2">
         <Button variant="secondary" disabled={step === 0} onClick={() => setStep(step - 1)}>

@@ -37,7 +37,7 @@ export function groupNamesOf(section) {
   return Array.from({ length: n }, (_, g) => section.groupNames?.[g] || `G${g + 1}`)
 }
 
-function roomFits(room, kind, students) {
+export function roomFits(room, kind, students) {
   // Events-only rooms (e.g. a seminar hall kept for bookings) never hold regular classes.
   if (room.eventsOnly || room.capacity < students) return false
   return kind === 'lab' ? room.type === 'lab' : LECTURE_ROOM_TYPES.has(room.type)
@@ -84,17 +84,26 @@ function makeContext(data) {
 
 // ---------- pre-check ----------
 
+// Each problem is also returned as a structured issue ({ kind, key, message, ...facts }) so the UI can explain it
+// and suggest changes (see diagnose.js). `problems` stays the plain list of messages.
 export function precheck(data, { departmentId, fixedEntries = [] } = {}) {
-  const problems = []
+  const issues = []
+  const report = (kind, message, facts = {}) => {
+    const key = [kind, ...Object.values(facts).filter((v) => typeof v === 'string')].join('|')
+    issues.push({ kind, key, message, ...facts })
+  }
+  const done = () => ({ ok: issues.length === 0, problems: issues.map((i) => i.message), issues })
   const scope = departmentId ? data.sections.filter((s) => s.deptId === departmentId) : data.sections
   const { days, periodsPerDay: P } = data.time
   if (!days.length || P < 1) {
-    return { ok: false, problems: ['Set at least one working day and one period per day.'] }
+    report('time', 'Set at least one working day and one period per day.')
+    return done()
   }
   const ctx = makeContext(data)
   const totalUnits = scope.reduce((n, s) => n + s.assignments.length, 0)
   if (!scope.length || totalUnits === 0) {
-    problems.push(
+    report(
+      'empty',
       departmentId ? 'Add at least one section with subjects to this department.' : 'Add at least one section with subjects assigned.',
     )
   }
@@ -115,20 +124,24 @@ export function precheck(data, { departmentId, fixedEntries = [] } = {}) {
     for (const a of sec.assignments) {
       const sub = ctx.subjects.get(a.subjectId)
       if (!sub) {
-        problems.push(`${sec.name}: one of its subjects no longer exists.`)
+        report('missing-subject', `${sec.name}: one of its subjects no longer exists.`, { sectionId: sec.id })
         continue
       }
       const teacher = ctx.teachers.get(a.teacherId)
       if (!teacher) {
-        problems.push(`${sec.name}: no teacher assigned for ${sub.name}.`)
+        report('missing-teacher', `${sec.name}: no teacher assigned for ${sub.name}.`, { sectionId: sec.id, subjectId: sub.id })
         continue
       }
       if (!(teacher.subjectIds || []).includes(sub.id)) {
-        problems.push(`${sec.name}: ${teacher.name} is assigned ${sub.name} but is not listed as teaching it.`)
+        report('not-qualified', `${sec.name}: ${teacher.name} is assigned ${sub.name} but is not listed as teaching it.`, {
+          sectionId: sec.id,
+          subjectId: sub.id,
+          teacherId: teacher.id,
+        })
       }
       const labTeacher = a.labTeacherId ? ctx.teachers.get(a.labTeacherId) : teacher
       if (!labTeacher) {
-        problems.push(`${sec.name}: the lab teacher chosen for ${sub.name} no longer exists.`)
+        report('missing-teacher', `${sec.name}: the lab teacher chosen for ${sub.name} no longer exists.`, { sectionId: sec.id, subjectId: sub.id, role: 'lab' })
         continue
       }
       const lec = sub.lectureHours || 0
@@ -144,20 +157,34 @@ export function precheck(data, { departmentId, fixedEntries = [] } = {}) {
       if (lab > 0) labsByLength.set(lab, (labsByLength.get(lab) || 0) + sessions * groups)
 
       if (lab > ctx.longestBlock) {
-        problems.push(
+        report(
+          'lab-too-long',
           `${sub.name} needs a ${lab}-period lab, but the longest stretch without a break is ${ctx.longestBlock} periods.`,
+          { subjectId: sub.id, labHours: lab, longestBlock: ctx.longestBlock },
         )
       }
       if (lab > 0 && !data.rooms.some((r) => roomFits(r, 'lab', groupSize))) {
         const who = groups > 1 ? `Each lab group of ${sec.name} (${groupSize} students)` : `${sec.name} (${sec.students} students)`
-        problems.push(`${who} needs a lab for ${sub.name}, but no lab room is big enough.`)
+        report('no-lab-room', `${who} needs a lab for ${sub.name}, but no lab room is big enough.`, {
+          sectionId: sec.id,
+          subjectId: sub.id,
+          students: groupSize,
+          groups,
+        })
       }
     }
     if (hours > ctx.S) {
-      problems.push(`${sec.name} needs ${hours} periods a week, but the week only has ${ctx.S} periods.`)
+      report('week-overflow', `${sec.name} needs ${hours} periods a week, but the week only has ${ctx.S} periods.`, {
+        sectionId: sec.id,
+        hours,
+        slots: ctx.S,
+      })
     }
     if (hours > 0 && !data.rooms.some((r) => roomFits(r, 'lecture', sec.students))) {
-      problems.push(`${sec.name} has ${sec.students} students, but no classroom or seminar hall is that big.`)
+      report('no-lecture-room', `${sec.name} has ${sec.students} students, but no classroom or seminar hall is that big.`, {
+        sectionId: sec.id,
+        students: sec.students,
+      })
     }
   }
 
@@ -167,22 +194,36 @@ export function precheck(data, { departmentId, fixedEntries = [] } = {}) {
     const t = ctx.teachers.get(id)
     const free = ctx.S - ctx.unavailable.get(id).size
     if (load > t.maxHours) {
-      problems.push(`${t.name} is assigned ${load} hours a week, more than their maximum of ${t.maxHours}.`)
+      report('teacher-max', `${t.name} is assigned ${load} hours a week, more than their maximum of ${t.maxHours}.`, {
+        teacherId: id,
+        load,
+        max: t.maxHours,
+      })
     }
     if (load > free) {
-      problems.push(`${t.name} is assigned ${load} hours but is only available for ${free} periods a week.`)
+      report('teacher-availability', `${t.name} is assigned ${load} hours but is only available for ${free} periods a week.`, {
+        teacherId: id,
+        load,
+        free,
+      })
     }
   }
 
   const lectureRooms = data.rooms.filter((r) => !r.eventsOnly && LECTURE_ROOM_TYPES.has(r.type)).length
   const labRooms = data.rooms.filter((r) => !r.eventsOnly && r.type === 'lab').length
   if (lectureDemand > lectureRooms * ctx.S) {
-    problems.push(
+    report(
+      'lecture-rooms',
       `Sections need ${lectureDemand} lecture periods, but ${lectureRooms} classroom(s) only offer ${lectureRooms * ctx.S}.`,
+      { demand: lectureDemand, rooms: lectureRooms, offered: lectureRooms * ctx.S },
     )
   }
   if (labDemand > labRooms * ctx.S) {
-    problems.push(`Sections need ${labDemand} lab periods, but ${labRooms} lab(s) only offer ${labRooms * ctx.S}.`)
+    report('lab-rooms', `Sections need ${labDemand} lab periods, but ${labRooms} lab(s) only offer ${labRooms * ctx.S}.`, {
+      demand: labDemand,
+      rooms: labRooms,
+      offered: labRooms * ctx.S,
+    })
   }
 
   // Lab blocks can't straddle the break, so count how many whole blocks fit in a week.
@@ -191,13 +232,15 @@ export function precheck(data, { departmentId, fixedEntries = [] } = {}) {
     const perDay = halves.reduce((n, h) => n + Math.floor(h / len), 0)
     const capacity = labRooms * ctx.D * perDay
     if (labRooms && perDay && needed > capacity) {
-      problems.push(
+      report(
+        'lab-blocks',
         `There are ${needed} ${len}-period lab sessions to schedule, but ${labRooms} lab room(s) can only hold ${capacity} per week (${perDay} per lab per day around the break).`,
+        { block: String(len), needed, capacity, rooms: labRooms, perDay },
       )
     }
   }
 
-  return { ok: problems.length === 0, problems }
+  return done()
 }
 
 // ---------- units & candidates ----------
@@ -453,16 +496,34 @@ function describeUnit(u, ctx) {
   return `${sub.name}${u.kind === 'lab' ? ' lab' : ''} for ${who}`
 }
 
-// Explain, in plain language, why the hardest unit could not be placed.
+// Explain, in plain language, why the hardest unit could not be placed. Also returns `failure`: the same facts as
+// plain data (the unit, and what blocked each of its possible start times) for diagnose.js to build suggestions.
 function explainFailure(units, ctx, best, failCount, fixedEntries) {
   const unplaced = units.filter((u) => !best.placed[u.idx])
-  if (!unplaced.length) return ''
+  if (!unplaced.length) return { reason: '', failure: null }
   const worst = unplaced.reduce((a, b) => (failCount[b.idx] > failCount[a.idx] ? b : a))
   const teacher = ctx.teachers.get(worst.teacherId)
   const what = describeUnit(worst, ctx)
+  const unit = {
+    sectionId: worst.sectionId,
+    subjectId: worst.subjectId,
+    teacherId: worst.teacherId,
+    kind: worst.kind,
+    length: worst.length,
+    students: worst.students,
+    ...(worst.group ? { group: worst.group, groupIndex: worst.groupIndex } : {}),
+  }
+  const failure = {
+    unit,
+    unplacedCount: unplaced.length,
+    unplaced: unplaced.map((u) => ({ sectionId: u.sectionId, subjectId: u.subjectId, teacherId: u.teacherId, kind: u.kind, length: u.length })),
+  }
 
   if (!worst.candidates.length) {
-    return `Couldn't place ${what}: ${teacher.name} is unavailable for every slot where a suitable room exists.`
+    return {
+      reason: `Couldn't place ${what}: ${teacher.name} is unavailable for every slot where a suitable room exists.`,
+      failure: { ...failure, slots: 0, teacherBusy: 0, sectionBusy: 0, roomsBusy: 0, open: 0, noCandidates: true },
+    }
   }
 
   // Replay the best partial timetable and see what blocks each possible start time.
@@ -477,6 +538,7 @@ function explainFailure(units, ctx, best, failCount, fixedEntries) {
   let teacherBusy = 0
   let sectionBusy = 0
   let roomsBusy = 0
+  let open = 0
   const tRow = state.row(state.teacher, worst.teacherId)
   const sRows = worst.sectionKeys.map((key) => state.row(state.section, key))
   for (const [s, cands] of starts) {
@@ -484,16 +546,20 @@ function explainFailure(units, ctx, best, failCount, fixedEntries) {
     if (range.some((x) => tRow[x])) teacherBusy++
     else if (range.some((x) => sRows.some((row) => row[x]))) sectionBusy++
     else if (!cands.some((c) => fits(state, worst, c))) roomsBusy++
+    else open++
   }
   const parts = []
   if (teacherBusy) parts.push(`${teacherBusy} already have ${teacher.name} teaching (in any department)`)
   if (sectionBusy) parts.push(`${sectionBusy} already have another class for ${ctx.sections.get(worst.sectionId).name}`)
   if (roomsBusy) parts.push(`${roomsBusy} have every suitable ${worst.kind === 'lab' ? 'lab' : 'room'} taken`)
-  return (
-    `Couldn't place ${what} (best attempt left ${unplaced.length} class${unplaced.length > 1 ? 'es' : ''} unplaced). ` +
-    `Of its ${starts.size} possible time slots, ${parts.join(', ')}. ` +
-    `Try adding a ${worst.kind === 'lab' ? 'lab' : 'room'}, giving ${teacher.name} more free slots, or reducing hours.`
-  )
+  if (open) parts.push(`${open} were still free when the search stopped`)
+  return {
+    reason:
+      `Couldn't place ${what} (best attempt left ${unplaced.length} class${unplaced.length > 1 ? 'es' : ''} unplaced). ` +
+      `Of its ${starts.size} possible time slots, ${parts.join(', ')}. ` +
+      `Try adding a ${worst.kind === 'lab' ? 'lab' : 'room'}, giving ${teacher.name} more free slots, or reducing hours.`,
+    failure: { ...failure, slots: starts.size, teacherBusy, sectionBusy, roomsBusy, open, noCandidates: false },
+  }
 }
 
 export function generateTimetable(data, options = {}) {
@@ -506,6 +572,8 @@ export function generateTimetable(data, options = {}) {
       entries: [],
       unplaced: [],
       problems: check.problems,
+      issues: check.issues,
+      failure: null,
       reason: check.problems.join(' '),
       stats: { placed: 0, total: 0, clashes: 0, quality: 0, steps: 0, restarts: 0, ms: Date.now() - started },
     }
@@ -533,6 +601,7 @@ export function generateTimetable(data, options = {}) {
   }
 
   const entries = toEntries(units, best.placed)
+  const explained = solved ? { reason: '', failure: null } : explainFailure(units, ctx, best, failCount, fixedEntries)
   // Verified together with the fixed classes, so cross-department clashes would be caught too.
   const clashes = findClashes([...fixedEntries, ...entries], data)
   return {
@@ -540,7 +609,12 @@ export function generateTimetable(data, options = {}) {
     entries,
     unplaced: units.filter((u) => !best.placed[u.idx]).map((u) => describeUnit(u, ctx)),
     problems: [],
-    reason: solved ? '' : explainFailure(units, ctx, best, failCount, fixedEntries),
+    issues: [],
+    reason: explained.reason,
+    failure: explained.failure && {
+      ...explained.failure,
+      search: { steps: totalSteps, restarts: Math.min(restarts, maxRestarts), timeLimitMs, timedOut: Date.now() >= deadline },
+    },
     stats: {
       placed: best.count,
       total: units.length,
@@ -552,6 +626,17 @@ export function generateTimetable(data, options = {}) {
     },
   }
 }
+
+/** What is kept of one department's run (in timetable.byDept) for the summary and the failure guidance. */
+export const runSummary = (r) => ({
+  ok: r.ok,
+  stats: r.stats,
+  reason: r.reason,
+  unplaced: r.unplaced,
+  problems: r.problems,
+  issues: r.issues ?? [],
+  failure: r.failure ?? null,
+})
 
 /**
  * Generates every department in turn (largest first). Each department is scheduled around the classes of the
@@ -568,7 +653,7 @@ export function generateCollege(data, options = {}) {
   const byDept = {}
   for (const d of departments) {
     const r = generateTimetable(data, { ...options, departmentId: d.id, fixedEntries: entries })
-    byDept[d.id] = { ok: r.ok, stats: r.stats, reason: r.reason, unplaced: r.unplaced, problems: r.problems }
+    byDept[d.id] = runSummary(r)
     entries = [...entries, ...r.entries]
   }
   const results = Object.entries(byDept)
@@ -581,6 +666,8 @@ export function generateCollege(data, options = {}) {
     byDept,
     unplaced: results.flatMap(([id, r]) => r.unplaced.map((u) => `${u} (${short(id)})`)),
     problems: results.flatMap(([id, r]) => r.problems.map((p) => `${short(id)}: ${p}`)),
+    issues: [],
+    failure: null,
     reason: results
       .filter(([, r]) => r.reason)
       .map(([id, r]) => `${short(id)}: ${r.reason}`)

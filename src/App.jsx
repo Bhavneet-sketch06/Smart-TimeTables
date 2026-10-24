@@ -158,11 +158,15 @@ const bookingInDept = (data, deptId) => (b) =>
 
 function AdminPage({ college, deptId }) {
   const [tab, setTab] = useState(college.data.timetable ? 'timetable' : 'setup')
+  const [failures, setFailures] = useState([])
   const upcoming = upcomingBookings(college.data.bookings ?? []).length
   const generateHere = () => {
     const r = generateDepartment(college.data, deptId)
+    setFailures(r.failures)
     if (r.timetable) college.setTimetable(r.timetable)
-    else setTab('setup')
+    else {
+      setTab('setup')
+    }
   }
   return (
     <div className="space-y-5">
@@ -176,7 +180,9 @@ function AdminPage({ college, deptId }) {
           { id: 'bookings', label: 'All bookings', Icon: Ticket, badge: upcoming },
         ]}
       />
-      {tab === 'setup' && <AdminWizard college={college} deptId={deptId} onGenerated={() => setTab('timetable')} />}
+      {tab === 'setup' && (
+        <AdminWizard college={college} deptId={deptId} initialFailures={failures} onGenerated={() => (setFailures([]), setTab('timetable'))} />
+      )}
       {tab === 'timetable' && (
         <TimetableViews
           data={college.data}

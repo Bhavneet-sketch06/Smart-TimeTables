@@ -1,6 +1,7 @@
 import { collegeQuality, findClashes, scoreQuality } from '../scheduler.js'
-import { ALL, deptById, entriesOf, expectedClasses } from '../data/departments.js'
+import { ALL, deptById, entriesOf, expectedClasses, fixedFor } from '../data/departments.js'
 import { Card } from './ui.jsx'
+import FailureGuidance from './FailureGuidance.jsx'
 
 function Stat({ label, value, tone = 'slate', hint }) {
   const tones = {
@@ -16,6 +17,24 @@ function Stat({ label, value, tone = 'slate', hint }) {
       {hint && <div className="text-xs text-slate-400">{hint}</div>}
     </Card>
   )
+}
+
+/**
+ * Runs that didn't produce a full timetable: the selected department's, or every department's for "All".
+ * Data without departments has one college-wide run (the timetable itself).
+ */
+function failedRuns(data, deptId) {
+  const tt = data.timetable
+  const byDept = Object.entries(tt.byDept ?? {})
+  if (!byDept.length) return tt.ok === false ? [{ deptId: ALL, run: tt, fixedEntries: [] }] : []
+  return byDept
+    .filter(([id, r]) => !r.ok && (deptId === ALL || id === deptId))
+    .map(([id, r]) => ({
+      deptId: id,
+      run: r,
+      fixedEntries: fixedFor(data, id),
+      heading: deptId === ALL ? `${deptById(data, id)?.name ?? id}: not every class could be placed` : undefined,
+    }))
 }
 
 /** Stats for the selected department (or the whole college). Clashes are always checked college-wide. */
@@ -52,13 +71,9 @@ export default function SummaryPanel({ data, deptId = ALL }) {
           hint={run?.stats ? `${run.stats.steps} steps · ${run.stats.restarts} restarts` : 'with the whole college'}
         />
       </div>
-      {run?.reason && (
-        <Card className="border-amber-200 bg-amber-50 text-sm text-amber-900">
-          <p className="font-semibold">Why the timetable is incomplete</p>
-          <p className="mt-1">{run.reason}</p>
-          {run.unplaced?.length > 0 && <p className="mt-1 text-xs">Unplaced: {[...new Set(run.unplaced)].join(', ')}</p>}
-        </Card>
-      )}
+      {failedRuns(data, deptId).map((f) => (
+        <FailureGuidance key={f.deptId} data={data} run={f.run} deptId={f.deptId} fixedEntries={f.fixedEntries} heading={f.heading} />
+      ))}
       {clashes.length > 0 && (
         <Card className="border-red-200 bg-red-50 text-sm text-red-800">
           <ul className="list-disc pl-5">

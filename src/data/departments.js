@@ -5,7 +5,7 @@
 // section.deptId / section.batch (e.g. '3rd Sem (D2)'), teacher.deptId (home department, null for service
 // departments such as Applied Sciences), subject.deptId (optional), room.deptId (optional home department).
 
-import { collegeQuality, findClashes } from '../scheduler.js'
+import { collegeQuality, findClashes, runSummary } from '../scheduler.js'
 
 export const ALL = 'all'
 
@@ -80,6 +80,12 @@ export function entriesOf(data, deptId) {
   return entries.filter((e) => ids.has(e.sectionId))
 }
 
+/** Every other department's classes: what a department is scheduled around. */
+export function fixedFor(data, deptId, entries = data.timetable?.entries ?? []) {
+  const deptOf = new Map(data.sections.map((s) => [s.id, s.deptId]))
+  return entries.filter((e) => deptOf.get(e.sectionId) !== deptId)
+}
+
 /** Batches (semester / class labels) in a department, in a stable order. */
 export const batchesOf = (data, deptId) =>
   [...new Set(sectionsOf(data, deptId).map(batchOf))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
@@ -106,7 +112,7 @@ export function mergeDepartmentTimetable(data, deptId, fixedEntries, result) {
   const previous = data.timetable?.byDept ?? {}
   const byDept = {
     ...previous,
-    [deptId]: { ok: result.ok, stats: result.stats, reason: result.reason, unplaced: result.unplaced, problems: result.problems },
+    [deptId]: runSummary(result),
   }
   const entries = [...fixedEntries, ...result.entries]
   const results = Object.values(byDept)
@@ -118,6 +124,8 @@ export function mergeDepartmentTimetable(data, deptId, fixedEntries, result) {
     reason: result.reason,
     unplaced: result.unplaced,
     problems: result.problems,
+    issues: result.issues ?? [],
+    failure: result.failure ?? null,
     stats: {
       placed: sum('placed'),
       total: sum('total'),
