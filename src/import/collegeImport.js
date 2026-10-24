@@ -193,9 +193,13 @@ export function buildImport(sheets, current, { mode = 'add' } = {}) {
     report('error', at(rec, field), `"${rec.values[field]}" should be yes or no.`)
     return false
   }
-  // Duplicate keys within the file, and (when adding) records that already exist. Keys rejected because they clash
-  // with the current setup are remembered, so rows referring to them don't produce follow-on messages.
+  // Duplicate keys within the file, and (when adding) records that already exist. Keys of rejected rows (a clash with
+  // the current setup, or a row with its own errors) are remembered, so rows referring to them don't produce
+  // misleading follow-on messages: the problem is already reported on the row itself.
   const rejected = Object.fromEntries(TABLE_KEYS.map((k) => [k, new Set()]))
+  const drop = (table, key) => {
+    if (key) rejected[table].add(keyOf(key))
+  }
   const unique = (table, keyField, existing, label) => {
     const seen = new Map()
     const ok = []
@@ -279,7 +283,10 @@ export function buildImport(sheets, current, { mode = 'add' } = {}) {
   for (const rec of unique('departments', 'code', (k) => !replacing && deptLookup.has(k), 'department')) {
     const code = need(rec, 'code')
     const name = need(rec, 'name')
-    if (!code || !name) continue
+    if (!code || !name) {
+      drop('departments', code)
+      continue
+    }
     const d = { id: reuseId(current.departments ?? [], (x) => keyOf(x.short) === keyOf(code), 'dept'), short: code, name, source: 'import' }
     newDepts.push(d)
     indexDept(d)
@@ -346,9 +353,13 @@ export function buildImport(sheets, current, { mode = 'add' } = {}) {
     const labHours = int(rec, 'lab_hours', { min: 0, max: 8, fallback: 0 })
     const labSessions = int(rec, 'lab_sessions', { min: 1, max: 6, fallback: 1 })
     const home = dept(rec, 'department')
-    if (!code || !name || lectureHours == null || labHours == null || labSessions == null) continue
+    if (!code || !name || lectureHours == null || labHours == null || labSessions == null) {
+      drop('subjects', code)
+      continue
+    }
     if (lectureHours + labHours === 0) {
       report('error', at(rec, 'lecture_hours'), 'This subject has no lecture hours and no lab, so there is nothing to schedule.')
+      drop('subjects', code)
       continue
     }
     if (!labHours && rec.values.lab_sessions && labSessions > 1) {
@@ -395,7 +406,10 @@ export function buildImport(sheets, current, { mode = 'add' } = {}) {
       else if (Number(m[2]) < 1 || Number(m[2]) > P) report('error', at(rec, 'unavailable'), `"${token}": the day has periods 1 to ${P}.`)
       else if (!unavailable.includes(`${day}-${Number(m[2])}`)) unavailable.push(`${day}-${Number(m[2])}`)
     }
-    if (!name || maxHours == null) continue
+    if (!name || maxHours == null) {
+      drop('teachers', name)
+      continue
+    }
     const t = {
       id: reuseId(current.teachers ?? [], (x) => keyOf(x.name) === keyOf(name), 't'),
       name,
@@ -428,7 +442,10 @@ export function buildImport(sheets, current, { mode = 'add' } = {}) {
     if (groupNames.length && labGroups != null && groupNames.length !== labGroups) {
       report('error', at(rec, 'group_names'), `${plural(groupNames.length, 'group name')} given for ${plural(labGroups, 'lab group')}.`)
     }
-    if (!name || !home || students == null || labGroups == null) continue
+    if (!name || !home || students == null || labGroups == null) {
+      drop('sections', name)
+      continue
+    }
     const s = {
       id: reuseId(current.sections ?? [], (x) => keyOf(x.name) === keyOf(name), 'sec'),
       name,

@@ -1,0 +1,64 @@
+﻿section,subject,teacher,lab_teacher
+CSE 3A,CS301,Dr. Rajesh Kumar,Mr. Rohit Verma
+CSE 3A,CS302,Dr. Neha Gupta,
+CSE 3A,CS303,Prof. Amandeep Singh,
+CSE 3A,CS399,Ms. Priya Sharma,
+CSE 3A,MA301,Dr. Sunita Rani,
+CSE 3A,HU301,Ms. Nidhi Bhatia,
+CSE 3B,CS301,Prof. Amandeep Singh,
+CSE 3B,CS302,Ms. Priya Sharma,Mr. Rohit Verma
+CSE 3B,CS303,Dr. Neha Gupta,
+CSE 3B,CS304,Ms. Priya Sharma,
+CSE 3B,MA301,Dr. Sunita Rani,
+CSE 3B,HU301,Ms. Nidhi Bhatia,
+CSE 5A,CS501,Dr. Sandeep Bansal,Mr. Rohit Verma
+CSE 5A,CS502,Prof. Kavita Joshi,
+CSE 5A,CS503,Dr. Sandeep Bansal,
+CSE 5A,CS504,Dr. Rajesh Kumar,
+CSE 5A,CS505,Dr. Neha Gupta,
+CSE 5A,HU501,Ms. Nidhi Bhatia,
+CSE 5B,CS501,Ms. Anjali Mehta,
+CSE 5B,CS502,Prof. Kavita Joshi,Mr. Rohit Verma
+CSE 5B,CS503,Ms. Anjali Mehta,
+CSE 5B,CS504,Ms. Simran Kaur,
+CSE 5B,CS505,Prof. Kavita Joshi,
+CSE 5B,HU501,Ms. Nidhi Bhatia,
+IT 3A,IT301,Dr. Harpreet Kaur,
+IT 3A,IT302,Prof. Manish Arora,Mr. Vivek Sood
+IT 3A,IT303,Ms. Deepika Rana,
+IT 3A,IT304,Dr. Harpreet Kaur,
+IT 3A,MA301,Dr. Sunita Rani,
+IT 3A,HU301,Ms. Nidhi Bhatia,
+IT 5A,IT501,Prof. Manish Arora,
+IT 5A,IT502,Mr. Vivek Sood,
+IT 5A,IT503,Dr. Unknown Person,
+IT 5A,IT504,Mr. Vivek Sood,
+IT 5A,HU501,Mr. Karan Malik,
+ECE 3A,EC301,Dr. Sunil Mehra,Mr. Harish Thakur
+ECE 3A,EC302,Prof. Ritu Malhotra,
+ECE 3A,EC303,Dr. Sunil Mehra,
+ECE 3A,EC304,Prof. Ritu Malhotra,
+ECE 3A,MA301,Dr. Arvind Kapoor,
+ECE 3A,HU301,Ms. Nidhi Bhatia,
+ECE 3B,EC301,Dr. Sunil Mehra,Mr. Harish Thakur
+ECE 3B,EC302,Prof. Ritu Malhotra,Mr. Harish Thakur
+ECE 3B,EC303,Ms. Pallavi Sethi,
+ECE 3B,EC304,Prof. Ritu Malhotra,
+ECE 3B,MA301,Dr. Arvind Kapoor,
+ECE 3B,HU301,Mr. Karan Malik,
+ECE 5A,EC501,Dr. Gaurav Chawla,Mr. Harish Thakur
+ECE 5A,EC502,Ms. Pallavi Sethi,
+ECE 5A,EC503,Dr. Gaurav Chawla,
+ECE 5A,EC504,Ms. Pallavi Sethi,
+ECE 5A,HU501,Mr. Karan Malik,
+ME 3A,ME301,Dr. Balwinder Singh,Mr. Tarun Bedi
+ME 3A,ME302,Prof. Anil Saini,
+ME 3A,ME303,Mr. Jaspreet Gill,Mr. Tarun Bedi
+ME 3A,ME304,Mr. Jaspreet Gill,
+ME 3A,MA301,Dr. Arvind Kapoor,
+ME 3A,HU301,Mr. Karan Malik,
+ME 5A,ME501,Prof. Anil Saini,
+ME 5A,ME502,Dr. Meenakshi Rao,Mr. Tarun Bedi
+ME 5A,ME503,Dr. Balwinder Singh,
+ME 5A,ME504,Dr. Meenakshi Rao,
+ME 5A,HU501,Mr. Karan Malik,

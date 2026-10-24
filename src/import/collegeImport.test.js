@@ -137,3 +137,12 @@ describe('import college data', () => {
     expect(result.issues.some((i) => /created from the codes used/.test(i.message))).toBe(true)
   })
 })
+
+test('a row with its own error does not cause misleading errors in rows that refer to it', () => {
+  const sheets = sampleSheets()
+  const teachers = sheets.find((s) => s.table === 'teachers')
+  teachers.rows[1][2] = '' // Dr. Asha Mehta: max_hours missing
+  const found = errors(buildImport(sheets, emptyCollege()))
+  expect(found).toHaveLength(1)
+  expect(found[0]).toMatchObject({ line: 2, field: 'max_hours' })
+})
