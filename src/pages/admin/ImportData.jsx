@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ArrowLeft, CalendarCog, CircleCheck, Download, FileUp, FlaskConical, ListChecks, ShieldCheck, Upload } from 'lucide-react'
 import { Button, Card } from '../../components/ui.jsx'
 import { LIMITS, buildImport, isSetupEmpty, readUpload, sheetFrom } from '../../import/collegeImport.js'
@@ -31,53 +31,87 @@ const downloadWorkbook = () =>
   download('college-data-template.xlsx', writeXlsx(templateSheets()), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 const downloadCsv = (key) => download(`${TABLES[key].file}.csv`, `﻿${toCsv(templateRows(key))}`, 'text/csv;charset=utf-8')
 
-/** Step 1: what can be imported, the templates, and the file picker. */
+/** Step 1: the file picker first, then templates; the table and column reference stays folded away until wanted. */
 function ChooseFiles({ onFiles, onSample, reading, readErrors }) {
-  const input = useRef(null)
   const [dragging, setDragging] = useState(false)
   return (
-    <div className="space-y-4">
-      <Card className="space-y-3">
-        <p className="text-slate-700">
-          Upload your college's existing data instead of typing it in. You'll review and fix it before anything is saved.
+    <div className="space-y-3">
+      <label
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDragging(true)
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragging(false)
+          onFiles([...e.dataTransfer.files])
+        }}
+        className={`flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed p-6 text-center transition ${
+          dragging ? 'border-indigo-500 bg-indigo-50' : 'border-slate-300 bg-white hover:border-indigo-400'
+        }`}
+      >
+        <FileUp className="h-8 w-8 text-indigo-500" />
+        <span className="font-semibold text-slate-800">{reading ? 'Reading files…' : 'Choose files or drop them here'}</span>
+        <span className="text-sm text-slate-500">.csv or .xlsx · several files at once · you review everything before it's saved</span>
+        <input
+          type="file"
+          multiple
+          accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          className="sr-only"
+          onChange={(e) => {
+            onFiles([...e.target.files])
+            e.target.value = ''
+          }}
+        />
+      </label>
+      {readErrors.length > 0 && (
+        <Card className="border-red-200 bg-red-50 text-sm text-red-800">
+          <p className="font-semibold">Some files couldn't be read:</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5">
+            {readErrors.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-slate-600">
+          CSV (one file per table) or Excel .xlsx (one sheet per table), up to 2 MB each.{' '}
+          <span className="inline-flex items-center gap-1 whitespace-nowrap">
+            <ShieldCheck className="h-4 w-4 text-emerald-600" /> Files stay in this browser.
+          </span>
         </p>
-        <ul className="grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
-          <li>
-            <b className="text-slate-800">CSV files (.csv)</b>: one file per table. Select several files at once.
-          </li>
-          <li>
-            <b className="text-slate-800">Excel workbook (.xlsx)</b>: one sheet per table, like the template.
-          </li>
-          <li>Up to 2 MB per file and {LIMITS.rows.toLocaleString()} rows per table. Old .xls, .ods and PDF files aren't supported.</li>
-          <li className="flex items-start gap-1.5">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> Files are read in this browser only. Nothing is uploaded.
-          </li>
-        </ul>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={downloadWorkbook}>
-            <Download className="h-4 w-4" /> Excel template (all tables)
+          <Button variant="secondary" onClick={downloadWorkbook}>
+            <Download className="h-4 w-4" /> Excel template
           </Button>
           <Button variant="secondary" onClick={onSample}>
             <FlaskConical className="h-4 w-4" /> Try with the sample data
           </Button>
         </div>
-        <p className="text-xs text-slate-500">
-          The template is filled with a small sample college ({SAMPLE_NAME}) that imports and generates a timetable as it is.
-          Replace its rows with your own data.
-        </p>
-      </Card>
+      </div>
 
-      <Card>
-        <h3 className="font-semibold text-slate-900">Tables and columns</h3>
-        <p className="mt-0.5 text-sm text-slate-500">
-          Records refer to each other by department code, subject code, section name and teacher name. Columns with * are
-          required. Put several values in one cell with ; between them. If your headers differ, you can match them in the next step.
-        </p>
-        <div className="mt-3 divide-y divide-slate-100">
+      <details className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+        <summary className="cursor-pointer font-medium text-indigo-700">What should my files contain?</summary>
+        <div className="mt-2 space-y-1 text-sm text-slate-600">
+          <p>
+            There are {TABLE_KEYS.length} tables. Records refer to each other by department code, subject code, section name and
+            teacher name. Columns with * are required; put several values in one cell with ; between them. If your headers
+            differ, you can match them after uploading.
+          </p>
+          <p>
+            The template is filled with a small sample college ({SAMPLE_NAME}) that imports and generates a timetable as it is.
+            Replace its rows with your own. Old .xls, .ods and PDF files aren't supported; up to {LIMITS.rows.toLocaleString()} rows
+            per table.
+          </p>
+        </div>
+        <div className="mt-2 divide-y divide-slate-100">
           {TABLE_KEYS.map((k) => {
             const t = TABLES[k]
             return (
-              <details key={k} className="group py-2">
+              <details key={k} className="py-2">
                 <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2">
                   <span>
                     <span className="font-medium text-slate-800">{t.label}</span>{' '}
@@ -110,48 +144,7 @@ function ChooseFiles({ onFiles, onSample, reading, readErrors }) {
             )
           })}
         </div>
-      </Card>
-
-      <label
-        onDragOver={(e) => {
-          e.preventDefault()
-          setDragging(true)
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault()
-          setDragging(false)
-          onFiles([...e.dataTransfer.files])
-        }}
-        className={`flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed p-6 text-center transition ${
-          dragging ? 'border-indigo-500 bg-indigo-50' : 'border-slate-300 bg-white hover:border-indigo-400'
-        }`}
-      >
-        <FileUp className="h-8 w-8 text-indigo-500" />
-        <span className="font-semibold text-slate-800">{reading ? 'Reading files…' : 'Choose files or drop them here'}</span>
-        <span className="text-sm text-slate-500">.csv or .xlsx · several files at once</span>
-        <input
-          ref={input}
-          type="file"
-          multiple
-          accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          className="sr-only"
-          onChange={(e) => {
-            onFiles([...e.target.files])
-            e.target.value = ''
-          }}
-        />
-      </label>
-      {readErrors.length > 0 && (
-        <Card className="border-red-200 bg-red-50 text-sm text-red-800">
-          <p className="font-semibold">Some files couldn't be read:</p>
-          <ul className="mt-1 list-disc space-y-0.5 pl-5">
-            {readErrors.map((e) => (
-              <li key={e}>{e}</li>
-            ))}
-          </ul>
-        </Card>
-      )}
+      </details>
     </div>
   )
 }
