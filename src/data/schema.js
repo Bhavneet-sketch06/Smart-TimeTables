@@ -69,6 +69,7 @@ export function emptyCollege() {
     sections: [],
     timetable: null,
     bookings: [],
+    requests: [],
   }
 }
 

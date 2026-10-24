@@ -34,6 +34,8 @@ src/
   scheduler.test.js              # runs scheduler on demo data, asserts zero clashes
   diagnose.js, diagnose.test.js  # PURE JS: failure guidance (causes ranked, suggested changes, pre-check/quick-test checks)
   myDay.js, myDay.test.js        # PURE JS: a student's day (classes in time order, now/next, next teaching day)
+  campusGuide.js (+ .test.js)    # PURE JS: space requests, public availability, upcoming classes, joint free times,
+                                 # admin room overview and shared-room use, demo requests (seedRequests)
   import/                        # PURE JS: Import College Data (no dependencies, nothing leaves the browser)
     formats.js                   # CSV parse/write, .xlsx read (zip + DecompressionStream) and minimal .xlsx write
     tables.js                    # accepted tables/columns (+ synonyms), sample college used for templates and demo
@@ -60,6 +62,8 @@ src/
     TimetableViews.jsx           # section / teacher / room tabs + summary (Admin, HOD)
     FacultyView.jsx, StudentView.jsx  # StudentView switches between MyDay.jsx and the weekly sheet
     booking/                     # BookSpace (4-step flow + receipt), BookingsList, BookingReceipt
+    campus/                      # Campus Guide tab for every role: CampusGuide (switch), Student/Faculty/Hod/AdminGuide,
+                                 # SpaceFinder (search + request/book), RequestsList, staffActions (book vs request)
 ```
 
 ## Data model (localStorage key `ttgen:v1`)
@@ -84,6 +88,8 @@ src/
   bookings: [{ id, status: "confirmed" | "cancelled", eventType, title, department, organizerId?, organizerName,
                attendance, notes, facilities, roomId, date: "YYYY-MM-DD", start: "HH:MM", duration, setup, cleanup,
                createdAt, createdBy: { role, teacherId? } }],
+  requests: [{ id, status: "pending" | "approved" | "declined" | "withdrawn", ...same fields as a booking,
+               requester: { role, name, clientId?, teacherId?, sectionId?, deptId? }, decidedAt?, decisionNote?, bookingId? }],
 }
 ```
 Rooms may have `facilities: string[]` and `eventsOnly: true` (never used for classes, only bookings).
@@ -144,6 +150,14 @@ blocks only its own group, so groups can be in different labs at the same time.
   ids of same-named records. `suggestMode` picks one. Any error blocks the import; the precheck shows as warnings.
   Saved through `importCollege` in useCollegeData (bookings kept, timetable cleared); imported data has
   `meta.source: 'import'` and departments `source: 'import'`.
+- Campus Guide (one tab name for every role, content by role): requests never hold a room; availability is the
+  timetable plus confirmed bookings only, for the whole interval (setup/cleanup included). Students always request;
+  faculty/HOD book their own department's rooms and request shared or other departments' rooms (`needsApproval`);
+  the admin confirms (`decideRequest` re-checks the room and creates the booking) or declines with a note.
+  Privacy: only the admin sees what occupies a room; everyone else gets `publicReason` text, HODs get free/busy
+  counts only. Requests change only through `requestSpace` / `withdrawRequest` / `decideRequest` /
+  `addSampleRequests`, saved like bookings (re-read, written immediately, autosave keeps the saved list).
+  Students are identified per browser (`ttgen:studentId`, name remembered in `ttgen:studentName`).
 - Book a Space: bookings change only through `bookSpace` / `cancelBooking` / `addSampleBookings` in
   `useCollegeData`, which re-read the saved bookings, re-check the room and write immediately. The autosave
   effect always keeps the saved bookings (never the in-memory copy), and a `storage` listener syncs other tabs.

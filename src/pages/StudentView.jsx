@@ -15,7 +15,7 @@ const VIEWS = [
   { id: 'week', label: 'Full week', Icon: CalendarDays },
 ]
 
-function readPick() {
+export function readPick() {
   try {
     return JSON.parse(localStorage.getItem(PICK_KEY)) || {}
   } catch {

@@ -3,7 +3,7 @@ import { useCollegeData } from './hooks/useCollegeData.js'
 import { usePrefs } from './hooks/usePrefs.js'
 import PrefsControls from './components/PrefsControls.jsx'
 import Landing from './pages/Landing.jsx'
-import { CalendarDays, CalendarPlus, ClipboardList, LayoutGrid, Settings2, Ticket, UserRound } from 'lucide-react'
+import { CalendarDays, CalendarPlus, ClipboardList, Compass, LayoutGrid, Settings2, Ticket, UserRound } from 'lucide-react'
 import { Button, Tabs } from './components/ui.jsx'
 import ChatWidget from './components/ChatWidget.jsx'
 import DepartmentBar, { HodDepartmentPicker } from './components/DepartmentBar.jsx'
@@ -11,6 +11,7 @@ import AdminWizard, { generateDepartment } from './pages/admin/AdminWizard.jsx'
 import TimetableViews from './pages/TimetableViews.jsx'
 import FacultyView, { currentFacultyId } from './pages/FacultyView.jsx'
 import StudentView from './pages/StudentView.jsx'
+import CampusGuide from './pages/campus/CampusGuide.jsx'
 import BookSpace from './pages/booking/BookSpace.jsx'
 import BookingsList from './pages/booking/BookingsList.jsx'
 import { upcomingBookings } from './booking.js'
@@ -121,7 +122,7 @@ export default function App() {
             {view === 'admin' && <AdminPage college={college} deptId={effective} />}
             {view === 'hod' && <HodPage college={college} deptId={effective} />}
             {view === 'faculty' && <FacultyPage college={college} deptId={effective} />}
-            {view === 'student' && <StudentView data={data} deptId={effective} />}
+            {view === 'student' && <StudentPage college={college} deptId={effective} />}
           </>
         )}
       </main>
@@ -131,6 +132,7 @@ export default function App() {
 }
 
 const BOOK_TAB = { id: 'book', label: 'Book a space', Icon: CalendarPlus }
+const GUIDE_TAB = { id: 'guide', label: 'Campus Guide', Icon: Compass }
 
 /** Booking tabs shared by every role that can book rooms. */
 function BookingTabs({ tab, setTab, college, deptId, organizer, createdBy, mine, listTitle, canCancel }) {
@@ -170,6 +172,7 @@ function AdminPage({ college, deptId }) {
   const [tab, setTab] = useState(college.data.timetable ? 'timetable' : 'setup')
   const [failures, setFailures] = useState([])
   const upcoming = upcomingBookings(college.data.bookings ?? []).length
+  const pendingRequests = (college.data.requests ?? []).filter((r) => r.status === 'pending').length
   const generateHere = () => {
     const r = generateDepartment(college.data, deptId)
     setFailures(r.failures)
@@ -186,10 +189,12 @@ function AdminPage({ college, deptId }) {
         tabs={[
           { id: 'setup', label: 'Setup', Icon: Settings2 },
           { id: 'timetable', label: 'Timetable', Icon: LayoutGrid },
+          { ...GUIDE_TAB, badge: pendingRequests },
           BOOK_TAB,
           { id: 'bookings', label: 'All bookings', Icon: Ticket, badge: upcoming },
         ]}
       />
+      {tab === 'guide' && <CampusGuide role="admin" college={college} deptId={deptId} />}
       {tab === 'setup' && (
         <AdminWizard college={college} deptId={deptId} initialFailures={failures} onGenerated={() => (setFailures([]), setTab('timetable'))} />
       )}
@@ -228,11 +233,13 @@ function HodPage({ college, deptId }) {
         onChange={setTab}
         tabs={[
           { id: 'timetables', label: 'Timetables', Icon: ClipboardList },
+          GUIDE_TAB,
           BOOK_TAB,
           { id: 'bookings', label: `${short} bookings`, Icon: Ticket, badge: upcoming },
         ]}
       />
       {tab === 'timetables' && <TimetableViews data={college.data} deptId={deptId} />}
+      {tab === 'guide' && <CampusGuide role="hod" college={college} deptId={deptId} />}
       {/* Coordinators see and cancel their department's bookings. */}
       <BookingTabs
         tab={tab}
@@ -264,12 +271,14 @@ function FacultyPage({ college, deptId }) {
         tabs={[
           { id: 'timetable', label: 'My timetable', Icon: UserRound },
           { id: 'department', label: 'Department timetable', Icon: LayoutGrid },
+          GUIDE_TAB,
           BOOK_TAB,
           { id: 'bookings', label: 'My bookings', Icon: Ticket, badge: upcoming },
         ]}
       />
       {tab === 'timetable' && <FacultyView data={college.data} deptId={deptId} />}
       {tab === 'department' && <TimetableViews data={college.data} deptId={deptId} showSummary={false} />}
+      {tab === 'guide' && <CampusGuide role="faculty" college={college} deptId={deptId} />}
       <BookingTabs
         key={`${teacherId}:${deptId}`}
         tab={tab}
@@ -282,6 +291,21 @@ function FacultyPage({ college, deptId }) {
         listTitle={teacher ? `My bookings · ${teacher.name}` : 'My bookings'}
         canCancel={isMine}
       />
+    </div>
+  )
+}
+
+function StudentPage({ college, deptId }) {
+  const [tab, setTab] = useState('timetable')
+  return (
+    <div className="space-y-5">
+      <Tabs
+        value={tab}
+        onChange={setTab}
+        tabs={[{ id: 'timetable', label: 'My timetable', Icon: CalendarDays }, GUIDE_TAB]}
+      />
+      {tab === 'timetable' && <StudentView data={college.data} deptId={deptId} />}
+      {tab === 'guide' && <CampusGuide role="student" college={college} deptId={deptId} />}
     </div>
   )
 }
