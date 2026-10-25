@@ -80,10 +80,24 @@ export function buildTimetableContext(data) {
     return [...lines, ...bookingLines(data)].join('\n')
   }
 
-  lines.push('', `TIMETABLE: ${tt.stats.placed}/${tt.stats.total} classes placed, ${tt.stats.clashes} clashes, quality ${tt.stats.quality}/100`)
+  // With accounts, a user receives only the classes their role may see (and students no summary at all).
+  const limited = !tt.stats || (data.busy?.rooms?.length ?? 0) > 0
+  if (tt.stats) {
+    lines.push('', `TIMETABLE: ${tt.stats.placed}/${tt.stats.total} classes placed, ${tt.stats.clashes} clashes, quality ${tt.stats.quality}/100`)
+  } else {
+    lines.push('', 'TIMETABLE: generated.')
+  }
+  if (limited) {
+    lines.push(
+      'Only the classes this user is allowed to see are listed. Sections not listed are hidden from them, not free: never say',
+      'anything about them or about who uses a room. For free rooms, point to the Campus Guide tab.',
+    )
+  }
   if (tt.reason) lines.push(`Incomplete because: ${tt.reason}`)
   const time = (e) => `${periods[e.period]?.start}-${periods[e.period + e.length - 1]?.end}`
+  const shown = new Set(tt.entries.map((e) => e.sectionId))
   for (const sec of data.sections) {
+    if (limited && !shown.has(sec.id)) continue
     lines.push('', `## ${sec.name}`)
     data.time.days.forEach((day, d) => {
       const today = tt.entries
