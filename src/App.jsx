@@ -171,7 +171,11 @@ const bookingInDept = (data, deptId) => (b) =>
 function AdminPage({ college, deptId }) {
   const [tab, setTab] = useState(college.data.timetable ? 'timetable' : 'setup')
   const [failures, setFailures] = useState([])
-  const upcoming = upcomingBookings(college.data.bookings ?? []).length
+  // With one department selected, only that department's bookings are listed and counted.
+  const inDept = bookingInDept(college.data, deptId)
+  const deptShort = deptId === ALL ? '' : deptById(college.data, deptId)?.short ?? ''
+  const bookingsLabel = deptShort ? `${deptShort} bookings` : 'All bookings'
+  const upcoming = upcomingBookings((college.data.bookings ?? []).filter(inDept)).length
   const pendingRequests = (college.data.requests ?? []).filter((r) => r.status === 'pending').length
   const generateHere = () => {
     const r = generateDepartment(college.data, deptId)
@@ -191,7 +195,7 @@ function AdminPage({ college, deptId }) {
           { id: 'timetable', label: 'Timetable', Icon: LayoutGrid },
           { ...GUIDE_TAB, badge: pendingRequests },
           BOOK_TAB,
-          { id: 'bookings', label: 'All bookings', Icon: Ticket, badge: upcoming },
+          { id: 'bookings', label: bookingsLabel, Icon: Ticket, badge: upcoming },
         ]}
       />
       {tab === 'guide' && <CampusGuide role="admin" college={college} deptId={deptId} />}
@@ -214,7 +218,8 @@ function AdminPage({ college, deptId }) {
         deptId={deptId}
         key={deptId}
         createdBy={{ role: 'admin' }}
-        listTitle="All bookings"
+        mine={deptId === ALL ? undefined : inDept}
+        listTitle={bookingsLabel}
         canCancel={() => true}
       />
     </div>
