@@ -42,13 +42,34 @@ export function Splash({ text = 'Loading…' }) {
   )
 }
 
-/** Email + password sign-in, and "forgot password" (a reset link by email). No sign-up: accounts are invited. */
+const TEXT = {
+  signin: { title: 'Sign in', intro: 'Use your email and password.', button: 'Sign in', busy: 'Signing in…' },
+  create: {
+    title: 'Create an account',
+    intro: "Enter your email. We'll send you a link: open it (on your phone is fine) to choose your password.",
+    button: 'Send link',
+    busy: 'Sending…',
+  },
+  reset: {
+    title: 'Reset your password',
+    intro: "Enter your account's email and we'll send you a link to choose a new password.",
+    button: 'Send reset link',
+    busy: 'Sending…',
+  },
+}
+
+/**
+ * Email + password sign-in, "Create an account" (an email link, then a password) and "Forgot password?".
+ * A new account starts with no access until an administrator approves it (enforced in the database).
+ */
 export function SignIn({ auth, controls, onBack }) {
-  const [mode, setMode] = useState('signin') // signin | reset | sent
+  const [mode, setMode] = useState('signin') // signin | create | reset
+  const [sent, setSent] = useState('') // the mode whose email was just sent
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const go = (next) => (setError(''), setSent(''), setMode(next))
 
   const submit = async (e) => {
     e.preventDefault()
@@ -56,37 +77,45 @@ export function SignIn({ auth, controls, onBack }) {
     if (!email.trim()) return setError('Enter your email address.')
     if (mode === 'signin' && !password) return setError('Enter your password.')
     setBusy(true)
-    const problem = mode === 'signin' ? await auth.signIn(email, password) : await auth.sendReset(email)
+    const problem =
+      mode === 'signin' ? await auth.signIn(email, password) : mode === 'create' ? await auth.createAccount(email) : await auth.sendReset(email)
     setBusy(false)
     if (problem) setError(problem)
-    else if (mode === 'reset') setMode('sent')
+    else if (mode !== 'signin') setSent(mode)
   }
 
+  const text = TEXT[mode]
   return (
     <AuthFrame controls={controls}>
       <Card className="space-y-5 p-6">
-        {mode === 'sent' ? (
+        {sent ? (
           <>
             <div className="space-y-2">
               <Mail className="h-8 w-8 text-indigo-600" />
               <h1 className="text-2xl font-bold">Check your email</h1>
               <p className="text-slate-600">
-                If an account exists for <b>{email.trim()}</b>, a link to set a new password is on its way. Open it on this device.
+                {sent === 'create' ? (
+                  <>
+                    We sent a link to <b>{email.trim()}</b>. Open it on any device, on your phone too, to choose your password. Then
+                    tell us who you are, and an administrator approves your access.
+                  </>
+                ) : (
+                  <>
+                    If an account exists for <b>{email.trim()}</b>, a link to set a new password is on its way.
+                  </>
+                )}
               </p>
+              <p className="text-sm text-slate-500">No email after a few minutes? Check spam, or try again later.</p>
             </div>
-            <Button variant="secondary" onClick={() => setMode('signin')}>
+            <Button variant="secondary" onClick={() => go('signin')}>
               <ArrowLeft className="h-4 w-4" /> Back to sign in
             </Button>
           </>
         ) : (
           <form className="space-y-4" onSubmit={submit} noValidate>
             <div>
-              <h1 className="text-2xl font-bold">{mode === 'signin' ? 'Sign in' : 'Reset your password'}</h1>
-              <p className="text-slate-500">
-                {mode === 'signin'
-                  ? 'Use the account your college administrator invited you with.'
-                  : "Enter your account's email and we'll send you a link to choose a new password."}
-              </p>
+              <h1 className="text-2xl font-bold">{text.title}</h1>
+              <p className="text-slate-500">{text.intro}</p>
             </div>
             <Field label="Email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
             {mode === 'signin' && (
@@ -101,39 +130,46 @@ export function SignIn({ auth, controls, onBack }) {
             <Problem>{error}</Problem>
             <Button type="submit" className="w-full py-2.5" disabled={busy}>
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-              {mode === 'signin' ? (busy ? 'Signing in…' : 'Sign in') : busy ? 'Sending…' : 'Send reset link'}
+              {busy ? text.busy : text.button}
             </Button>
             <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-              <button
-                type="button"
-                className="font-medium text-indigo-700 hover:underline"
-                onClick={() => (setError(''), setMode(mode === 'signin' ? 'reset' : 'signin'))}
-              >
-                {mode === 'signin' ? 'Forgot password?' : 'Back to sign in'}
-              </button>
-              {onBack && (
-                <button type="button" className="text-slate-500 hover:underline" onClick={onBack}>
-                  About Smart TimeTables
+              {mode === 'signin' ? (
+                <>
+                  <button type="button" className="font-medium text-indigo-700 hover:underline" onClick={() => go('create')}>
+                    New here? Create an account
+                  </button>
+                  <button type="button" className="font-medium text-indigo-700 hover:underline" onClick={() => go('reset')}>
+                    Forgot password?
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="font-medium text-indigo-700 hover:underline" onClick={() => go('signin')}>
+                  Back to sign in
                 </button>
               )}
             </div>
+            {onBack && (
+              <button type="button" className="text-sm text-slate-500 hover:underline" onClick={onBack}>
+                About Smart TimeTables
+              </button>
+            )}
           </form>
         )}
       </Card>
       <p className="mt-4 text-center text-sm text-slate-500">
-        There is no public sign-up. Your administrator creates accounts and decides what each one can see.
+        New accounts see nothing until an administrator approves them and decides what each one can see.
       </p>
     </AuthFrame>
   )
 }
 
-/** After an invitation or a reset link: choose a password before going on. */
+/** After an invitation, a reset link or a new account's link: choose a password before going on. */
 export function SetPassword({ auth, controls }) {
   const [password, setPassword] = useState('')
   const [repeat, setRepeat] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const invited = linkType === 'invite'
+  const invited = linkType === 'invite' || linkType === 'signup' || linkType === 'magiclink'
 
   const submit = async (e) => {
     e.preventDefault()

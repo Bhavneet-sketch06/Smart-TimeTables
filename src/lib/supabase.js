@@ -14,8 +14,9 @@ export const supabaseConfigured = Boolean(url && key)
  */
 export const localDemoAllowed = !supabaseConfigured && (import.meta.env.DEV || import.meta.env.VITE_LOCAL_DEMO === 'true')
 
-// Invitation and password-reset links land here with "#...&type=invite" / "type=recovery". Read it before the
-// client consumes (and clears) the URL hash, so the app can ask the user to choose a password.
+// Email links land here with "#...&type=invite" (invitation), "type=recovery" (password reset), or "type=signup" /
+// "type=magiclink" (Create account). Read it before the client consumes (and clears) the URL hash, so the app can
+// ask the user to choose a password.
 export const linkType = (() => {
   try {
     return new URLSearchParams(window.location.hash.slice(1)).get('type') ?? ''
@@ -27,6 +28,9 @@ export const linkType = (() => {
 export const supabase = supabaseConfigured
   ? createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } })
   : null
+
+/** Link types after which the user chooses a password (a new account has none yet). */
+export const PASSWORD_LINKS = ['invite', 'recovery', 'signup', 'magiclink']
 
 /** Where Supabase sends people back to from email links (must be listed under Auth → URL Configuration). */
 export const redirectUrl = () => `${window.location.origin}/`

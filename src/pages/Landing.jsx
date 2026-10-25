@@ -252,7 +252,7 @@ export default function Landing({ onSelect, lastRole, controls, accounts = false
                 {[
                   [ShieldCheck, 'Zero clashes'],
                   [FlaskConical, 'Labs & groups'],
-                  [Lock, accounts ? 'Invite-only, role-based access' : 'Data stays in your browser'],
+                  [Lock, accounts ? 'Role-based access, approved by your college' : 'Data stays in your browser'],
                 ].map(([Icon, label]) => (
                   <li key={label} className="inline-flex items-center gap-1.5">
                     <Icon className="h-4 w-4 text-indigo-500" /> {label}

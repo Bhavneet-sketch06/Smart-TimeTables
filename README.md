@@ -1,7 +1,7 @@
 # College Timetable Generator
 
 Generate clash-free weekly timetables for any college. Timetables are generated in the browser; with Supabase
-configured, people **sign in** (invite-only) and share one college database, and each account sees only what its
+configured, people **sign in** (new accounts wait for an administrator's approval) and share one college database, and each account sees only what its
 role allows (enforced by Row Level Security in the database).
 
 ## Try it

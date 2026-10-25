@@ -1,7 +1,8 @@
 # College Timetable Generator
 
 Timetable generator for any college. Generation runs in the browser. With Supabase configured (`VITE_SUPABASE_URL`,
-`VITE_SUPABASE_PUBLISHABLE_KEY`), users sign in (invite-only, email/password) and share one college database; role and
+`VITE_SUPABASE_PUBLISHABLE_KEY`), users sign in (email/password; "Create an account" sends an email link, new accounts stay pending until an admin
+approves them) and share one college database; role and
 scope come from `public.profiles` and every permission is enforced by RLS/triggers in the database. Without those
 values, `npm run dev` (or a build with `VITE_LOCAL_DEMO=true`) runs the old browser-only demo (localStorage, role
 picker). Static site on Vercel. Setup: docs/SUPABASE_SETUP.md.

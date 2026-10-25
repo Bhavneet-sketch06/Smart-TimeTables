@@ -260,9 +260,10 @@ export default function UsersAdmin({ data, me }) {
       <Card className="flex items-start gap-3 border-indigo-200 bg-indigo-50/60">
         <UserPlus className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" />
         <p className="text-sm text-slate-700">
-          To add someone, invite them in the Supabase Dashboard (Authentication → Users → Invite user). After signing in they
-          can say who they are; their request appears here filled in, and you approve or decline it. They see nothing until
-          you approve. You can also set the role yourself. Public sign-up stays off.
+          New people create an account from the sign-in screen (if sign-ups are on in Supabase), or you invite them in the
+          Supabase Dashboard (Authentication → Users → Invite user). After signing in they say who they are; their request
+          appears here filled in, and you approve or decline it. They see nothing until you approve. You can also set the
+          role yourself.
         </p>
       </Card>
       <div className="flex flex-wrap items-end gap-3">

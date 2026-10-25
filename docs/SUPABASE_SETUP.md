@@ -78,13 +78,21 @@ functions (not exposed through the API), and revoke the default `anon` access on
 
 ## 4. Auth settings (Dashboard → Authentication)
 
-- **Sign-ups**: keep "Allow new users to sign up" **off** (you have done this). The app has no sign-up form.
+- **Sign-ups** (Authentication → Sign In / Providers → "Allow new users to sign up"):
+  - **On**: people use **Create an account** on the sign-in screen. They enter their email, open the link from the
+    email on any device (their phone too, once the app has a real address), choose a password, and send an access
+    request. New accounts are always pending, with no college data, until an administrator approves them. Expect
+    the occasional unknown sign-up waiting in the Users tab: decline it.
+  - **Off**: only people you invite from the Dashboard get accounts (Create an account then says it's turned off).
+  Keep **Email** as a provider and "Confirm email" on, so every account proves it owns its address.
 - **URL Configuration**:
   - Site URL: `http://localhost:5173` while developing (your production URL later, see section 8).
   - Redirect URLs: add `http://localhost:5173/**` (and later your production URL with `/**`).
-  Invitation and password-reset emails link back here; the app then asks the user to choose a password.
-- **Email**: Supabase's built-in email service is rate-limited and meant for testing. For real use, set up custom
-  SMTP (Authentication → Emails → SMTP settings).
+  Invitation, create-account and password-reset emails link back here; the app then asks the user to choose a
+  password. A link only works on another device (a phone) once the Site URL is a real address, not localhost.
+- **Email**: Supabase's built-in email service is for testing: it sends only a few emails an hour and, as far as we
+  know, only to your project team's own addresses. For students and staff to receive links, set up custom SMTP
+  (Authentication → Emails → SMTP settings, e.g. Brevo, Resend, or a Gmail app password).
 
 ## 5. Create the first administrator (one time)
 
@@ -99,11 +107,13 @@ functions (not exposed through the API), and revoke the default `anon` access on
 If every administrator is ever lost, an owner of the Supabase project can restore one by editing the `profiles`
 row in the Table Editor or SQL Editor (the guard only applies to requests made from the app).
 
-## 6. Invite and assign users
+## 6. New accounts and assigning users
 
-1. Dashboard → Authentication → Users → **Invite user** (one email per person). For test accounts you can instead use
-   **Add user → Create new user** with "Auto Confirm User" (no email is sent).
-2. They open the email link and choose a password (on the computer running the app while it is on localhost). They
+1. Accounts are created in one of three ways:
+   - the person uses **Create an account** in the app (sign-ups on, see section 4);
+   - you **Invite user** in Dashboard → Authentication → Users;
+   - for test accounts, **Add user → Create new user** with "Auto Confirm User" (no email is sent).
+2. They open the email link and choose a password (on localhost, open it on the computer running the app). They
    then see "Ask your administrator for access" and no college data.
 3. **They say who they are**: on that screen they choose Student / Faculty / HOD, their department, and their section
    (+ semester) or faculty name, add an optional note (roll number, employee ID) and **Send request**. This grants

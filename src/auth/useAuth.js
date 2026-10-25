@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { linkType, redirectUrl, supabase } from '../lib/supabase.js'
+import { PASSWORD_LINKS, linkType, redirectUrl, supabase } from '../lib/supabase.js'
 
 /**
  * Supabase session and the signed-in user's profile (their trusted role and scope, from public.profiles).
@@ -7,12 +7,12 @@ import { linkType, redirectUrl, supabase } from '../lib/supabase.js'
  *
  * session: undefined while restoring, null when signed out.
  * profile: { status: 'loading' | 'ready' | 'error', row, error }
- * needsPassword: true after an invitation or password-reset link, until a new password is saved.
+ * needsPassword: true after an invitation, password-reset or create-account link, until a password is saved.
  */
 export function useAuth() {
   const [session, setSession] = useState(undefined)
   const [profile, setProfile] = useState({ status: 'loading', row: null, error: '' })
-  const [needsPassword, setNeedsPassword] = useState(linkType === 'invite' || linkType === 'recovery')
+  const [needsPassword, setNeedsPassword] = useState(PASSWORD_LINKS.includes(linkType))
 
   useEffect(() => {
     let alive = true
@@ -64,6 +64,18 @@ export function useAuth() {
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: redirectUrl() })
     return error ? friendlyAuthError(error) : ''
   }
+  /**
+   * Create account: emails a link (new accounts need public sign-ups allowed in Supabase). Opening it signs the
+   * person in on that device, where they choose a password. The account starts pending, with no access, until an
+   * administrator approves it.
+   */
+  const createAccount = async (email) => {
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: { shouldCreateUser: true, emailRedirectTo: redirectUrl() },
+    })
+    return error ? friendlyAuthError(error) : ''
+  }
   const setPassword = async (password) => {
     const { error } = await supabase.auth.updateUser({ password })
     if (error) return friendlyAuthError(error)
@@ -81,6 +93,7 @@ export function useAuth() {
     signIn,
     signOut,
     sendReset,
+    createAccount,
     setPassword,
   }
 }
@@ -89,6 +102,7 @@ function friendlyAuthError(error) {
   const msg = error?.message ?? ''
   if (/invalid login credentials/i.test(msg)) return 'That email and password do not match an account.'
   if (/email not confirmed/i.test(msg)) return 'Confirm your email first: open the link in the invitation email.'
+  if (/signups? not allowed|sign ?ups? (are )?disabled/i.test(msg)) return 'Creating accounts is turned off. Ask your administrator for an invitation.'
   if (/rate limit|too many/i.test(msg)) return 'Too many attempts. Wait a minute and try again.'
   if (/password/i.test(msg) && /(short|weak|characters)/i.test(msg)) return msg
   if (/fetch|network/i.test(msg)) return 'Could not reach the sign-in service. Check your connection.'
