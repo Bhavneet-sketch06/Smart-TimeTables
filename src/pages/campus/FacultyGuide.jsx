@@ -9,13 +9,15 @@ import RequestsList from './RequestsList.jsx'
 import { STAFF_EVENT_TYPES, staffActions } from './staffActions.js'
 
 /** Faculty Campus Guide: their own upcoming classes, a room finder, and their own bookings and requests. */
-export default function FacultyGuide({ college, deptId = ALL }) {
+export default function FacultyGuide({ college, deptId = ALL, teacherId: signedIn }) {
   const { data } = college
-  const teacherId = currentFacultyId(data, deptId)
+  const teacherId = signedIn ?? currentFacultyId(data, deptId)
   const teacher = data.teachers.find((t) => t.id === teacherId)
   if (!teacher) return <EmptyState>No faculty members are set up for this department yet.</EmptyState>
 
-  const dept = (data.departments ?? []).find((d) => d.id === teacher.deptId)
+  // A signed-in faculty member acts for the department on their account (the database checks the same one).
+  const homeDept = signedIn ? deptId : teacher.deptId
+  const dept = (data.departments ?? []).find((d) => d.id === homeDept)
   const classes = data.timetable ? upcomingClasses(data, data.timetable.entries.filter((e) => e.teacherId === teacherId), new Date(), { limit: 5 }) : []
   const subjects = new Map(data.subjects.map((s) => [s.id, s]))
   const sections = new Map(data.sections.map((s) => [s.id, s]))
@@ -25,15 +27,17 @@ export default function FacultyGuide({ college, deptId = ALL }) {
     role: 'faculty',
     name: teacher.name,
     teacherId,
-    deptId: teacher.deptId,
+    deptId: homeDept,
     department: dept?.short ?? teacher.department ?? '',
   })
 
   return (
     <div className="space-y-6">
-      <p className="text-slate-500">
-        Showing <b className="text-slate-700">{teacher.name}</b>. Change who you are on the My timetable tab.
-      </p>
+      {!signedIn && (
+        <p className="text-slate-500">
+          Showing <b className="text-slate-700">{teacher.name}</b>. Change who you are on the My timetable tab.
+        </p>
+      )}
 
       <section className="space-y-3">
         <h2 className="flex items-center gap-2 text-xl font-bold">

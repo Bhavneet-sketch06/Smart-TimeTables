@@ -7,6 +7,10 @@ import Anthropic from '@anthropic-ai/sdk'
 export const config = { maxDuration: 60 }
 
 const MODEL = 'claude-opus-5-5'
+// With accounts (Supabase configured), only signed-in users with active access may use the assistant. These are the
+// public project URL and publishable key; the user's own token decides what the database returns.
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+const SUPABASE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY
 const MAX_TURNS = 20
 const MAX_MESSAGE_CHARS = 2000
 const MAX_CONTEXT_CHARS = 200_000
@@ -54,6 +58,27 @@ function validate(messages, context) {
   return null
 }
 
+/** Returns an error message, or null if the caller may use the assistant. */
+async function checkAccount(req) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return null // browser-only demo: no accounts exist
+  const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '')
+  if (!token) return 'Sign in to use the assistant.'
+  let sub = ''
+  try {
+    sub = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8')).sub ?? ''
+  } catch {
+    return 'Your session is not valid. Sign in again.'
+  }
+  // The database verifies the token; RLS returns only the caller's own profile row (or all, for administrators).
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=role,active&user_id=eq.${encodeURIComponent(sub)}`, {
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` },
+  }).catch(() => null)
+  if (!res) return 'Could not check your account. Try again.'
+  if (!res.ok) return 'Your session has expired. Sign in again.'
+  const rows = await res.json().catch(() => [])
+  return rows.some((r) => r.active && r.role !== 'pending') ? null : 'Your account has no access yet. Ask your administrator.'
+}
+
 function friendlyError(err) {
   if (err instanceof Anthropic.AuthenticationError) return 'The API key was rejected. Check ANTHROPIC_API_KEY.'
   if (err instanceof Anthropic.RateLimitError) return 'The assistant is busy right now. Please try again in a moment.'
@@ -66,6 +91,9 @@ export default async function handler(req, res) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return fail(res, 503, 'The assistant is not set up yet: add ANTHROPIC_API_KEY to .env.local (or the Vercel project settings).')
   }
+
+  const denied = await checkAccount(req)
+  if (denied) return fail(res, 401, denied)
 
   let body
   try {

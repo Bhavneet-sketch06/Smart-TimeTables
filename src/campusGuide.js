@@ -113,6 +113,12 @@ export const isPast = (r, now = new Date()) => new Date(`${r.date}T${toHHMM(wind
 // ---------- classes ----------
 
 /**
+ * Every section's classes as far as free/busy goes: the timetable entries the user can see, plus (with shared
+ * data) other departments' busy periods from data.busy.sections, which carry no subject, teacher or room.
+ */
+export const sectionClasses = (data) => [...(data.timetable?.entries ?? []), ...(data.busy?.sections ?? [])]
+
+/**
  * The next occurrences of a set of weekly classes from now, across the coming days:
  * [{ date, dayName, start, end, entry, today }], soonest first.
  */
@@ -146,7 +152,7 @@ export function commonFreeSlots(data, sectionIds, { minPeriods = 1 } = {}) {
   const { periods } = periodTimes(data.time)
   const ids = new Set(sectionIds)
   const busy = new Set()
-  for (const e of data.timetable?.entries ?? []) {
+  for (const e of sectionClasses(data)) {
     if (!ids.has(e.sectionId)) continue
     for (let k = 0; k < e.length; k++) busy.add(`${e.day}|${e.period + k}`)
   }
@@ -181,7 +187,7 @@ export function jointTimes(data, sectionIds, { minPeriods = 1, partialLimit = 4 
   const total = sectionIds.length
   const busyBy = new Map() // "day|period" -> sections busy
   const ids = new Set(sectionIds)
-  for (const e of data.timetable?.entries ?? []) {
+  for (const e of sectionClasses(data)) {
     if (!ids.has(e.sectionId)) continue
     for (let k = 0; k < e.length; k++) {
       const key = `${e.day}|${e.period + k}`

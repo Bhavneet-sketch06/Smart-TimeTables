@@ -1,6 +1,10 @@
 # College Timetable Generator
 
-Browser-only timetable generator for any college. No backend: all data lives in localStorage. Deployed as a static site on Vercel. Built as a 120-minute hackathon prototype.
+Timetable generator for any college. Generation runs in the browser. With Supabase configured (`VITE_SUPABASE_URL`,
+`VITE_SUPABASE_PUBLISHABLE_KEY`), users sign in (invite-only, email/password) and share one college database; role and
+scope come from `public.profiles` and every permission is enforced by RLS/triggers in the database. Without those
+values, `npm run dev` (or a build with `VITE_LOCAL_DEMO=true`) runs the old browser-only demo (localStorage, role
+picker). Static site on Vercel. Setup: docs/SUPABASE_SETUP.md.
 
 ## Stack
 - React 18 + Vite 5, lucide-react icons
@@ -9,7 +13,9 @@ Browser-only timetable generator for any college. No backend: all data lives in 
   Never expose the key to the browser (no `VITE_` prefix, never import the SDK in `src/`).
 - Tailwind CSS v4 via `@tailwindcss/vite` (no `tailwind.config.js` / PostCSS config)
 - Vitest for tests (configured in `vite.config.js`, Node environment)
-- No router: `App.jsx` holds a `view` state (`landing | admin | hod | faculty | student`)
+- Supabase (`@supabase/supabase-js`, publishable key only; never a secret/service key in `src/` or any `VITE_` var).
+  `supabase/migrations/*.sql` are applied manually by the owner; `supabase/tests/rls.test.js` runs them in PGlite.
+- No router: `App.jsx` picks AccountsApp (sign-in → role from profile) or LocalDemoApp (`view` state, role picker)
 
 ## Commands
 ```bash
@@ -25,9 +31,16 @@ deployed as serverless functions automatically. Set `ANTHROPIC_API_KEY` in Proje
 
 ## Folder structure
 ```
-api/chat.js                      # assistant endpoint: validates input, streams Claude's answer as plain text
+api/chat.js                      # assistant endpoint: checks the Supabase session (when configured), streams Claude's answer
+supabase/migrations/             # profiles/roles, college tables + RLS, guard triggers, free/busy + save_college/decide_request
+supabase/manual/first_admin.sql  # one-time first-administrator bootstrap (run by hand)
+supabase/tests/rls.test.js       # migrations + policies checked per role in PGlite
+docs/SUPABASE_SETUP.md           # env, migrations, first admin, inviting users, Vercel
 src/
-  main.jsx, App.jsx, index.css   # entry, view switcher, Tailwind import
+  main.jsx, App.jsx, index.css   # entry, accounts vs browser-only demo, workspace header, Tailwind import
+  lib/supabase.js                # client (null when not configured), localDemoAllowed, linkType (invite/recovery)
+  auth/useAuth.js                # session, own profile (read only), sign in/out, reset, set password
+  remote/collegeRows.js (+test)  # PURE: rows <-> college object, data.busy (free/busy), save payloads, verifyCopy
   chat/timetableContext.js       # data + timetable + bookings -> compact text for the assistant (cached)
   booking.js, booking.test.js    # PURE JS: Book a Space room checks, suggestions, demo bookings (seedBookings)
   scheduler.js                   # PURE JS: precheck, generateTimetable, findClashes, scoreQuality
@@ -48,17 +61,21 @@ src/
     gndecCollege.js              # GNDEC demo: real CSE + SAMPLE ECE/ME/Civil (+ EE not set up), shared rooms/teachers
     departments.js               # normalizeCollege, sectionsOf/teachersOf/subjectsOf/entriesOf, mergeDepartmentTimetable
   departments.test.js            # department scoping + cross-department generation
-  hooks/useCollegeData.js        # localStorage-backed state (key `ttgen:v1`)
+  hooks/useCollegeData.js        # browser-only demo state (localStorage key `ttgen:v1`)
+  hooks/useRemoteCollege.js      # same interface backed by Supabase; mutations are async (callers await both)
   hooks/usePrefs.js              # theme (light/dark/system) (key `ttgen:prefs`)
   theme-dark.css                 # GENERATED: dark theme flips Tailwind colour scales under `.dark`
   components/                    # TimetableGrid (days across, times down, legend), TimetableSheet (title + Print),
                                  # SummaryPanel, FailureGuidance, PrefsControls, ChatWidget, DepartmentBar (+ HOD picker),
                                  # DepartmentEmpty ("set up / generate this department" prompt), ui bits
   pages/
-    Landing.jsx                  # role selector
+    Landing.jsx                  # landing; role cards (demo) or "Sign in" everywhere (`accounts`)
+    RolePages.jsx                # AdminPage / HodPage / FacultyPage / StudentPage; `me` = signed-in identity or null
+    auth/AuthScreens.jsx         # SignIn (+ reset), SetPassword, AccessPending, NotConfigured, LoadError, Splash
     admin/                       # setup wizard: Time → Rooms → Subjects → Teachers → Sections
                                  # ImportData.jsx / ImportReview.jsx: choose files → map → validate → apply
                                  # (subjects before teachers so "can teach" has options); listUtils.js helpers
+                                 # UsersAdmin.jsx (assign role/scope, access on/off), BrowserDataImport.jsx (ttgen:v1 → db)
     TimetableViews.jsx           # section / teacher / room tabs + summary (Admin, HOD)
     FacultyView.jsx, StudentView.jsx  # StudentView switches between MyDay.jsx and the weekly sheet
     booking/                     # BookSpace (4-step flow + receipt), BookingsList, BookingReceipt
@@ -110,6 +127,20 @@ Timetable entry: `{ sectionId, subjectId, teacherId, roomId, day, period, length
 Lab groups: a section with `labGroups: 2` takes each lab as two group units (e.g. A1, A2), each needing a lab
 room for half the students; `labSessions` lab blocks per group per week. Lectures block every group; a lab
 blocks only its own group, so groups can be in different labs at the same time.
+
+## Accounts and shared data (Supabase)
+- Tables keep the app's objects in `data jsonb`; policy columns (dept_id, teacher_id, section_id, room_id, status)
+  are generated from `data` or set by triggers. Teachers' `maxHours`/`maxPerDay`/`unavailable` live in
+  `teacher_private`. Catalogue + timetable writes go only through `save_college(p)` (admin; keys optional, a present
+  key replaces that part). Request decisions go through `decide_request`.
+- Roles: admin (all); hod (dept); faculty (teacher + dept: dept entries + own classes); student (own section entries).
+  Non-admins get free/busy without details in `data.busy` ({ rooms, sections (HOD only), holds }), used by
+  `classIntervals`/`holdIntervals` (booking.js) and `sectionClasses` (campusGuide.js). Never show busy rows as classes.
+- Bookings: staff book only their department's rooms (`needsApproval`), DB exclusion constraint prevents overlaps;
+  triggers fill creator/requester/department from the profile; non-admins can only cancel / withdraw.
+- Pages take `me` ({ userId, teacherId, sectionId }); when set, identity pickers are hidden and the department is fixed.
+- Changing SQL: add a new migration file (never edit applied ones once the owner has run them) and extend
+  supabase/tests/rls.test.js.
 
 ## Scheduler (src/scheduler.js)
 1. `precheck(data)` → `{ ok, problems }` with plain-language problems for impossible input.

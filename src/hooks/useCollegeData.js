@@ -20,7 +20,8 @@ export function studentClientId() {
 // Older saved data has no department list: normalizeCollege upgrades it on every load.
 const fromJson = (raw) => normalizeCollege({ ...emptyCollege(), ...JSON.parse(raw) })
 
-function readStored() {
+/** The college saved in this browser (the browser-only version's data), or null. */
+export function readStored() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) return fromJson(raw)
@@ -34,6 +35,16 @@ const withDemoBookings = (data) => {
   const college = normalizeCollege(data)
   const bookings = seedBookings(college)
   return { ...college, bookings, requests: seedRequests(college, bookings, nextWorkingDay(college), studentClientId()) }
+}
+
+/** Deletes the browser-only copy (only after it has been copied to the shared database and verified). */
+export function removeStored() {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+    return true
+  } catch {
+    return false
+  }
 }
 
 function write(data) {

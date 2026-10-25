@@ -41,6 +41,8 @@ export default function AdminWizard({ college, deptId = ALL, onGenerated, initia
   // Import College Data replaces the wizard until the administrator goes back to manual setup.
   const [importing, setImporting] = useState(false)
   const { title, Component, shared } = STEPS[step]
+  // With accounts these replace the college for everyone (bookings and requests included), so ask first.
+  const sure = (what) => !college.shared || window.confirm(`${what} the shared college data for everyone, including all bookings and space requests?`)
   const last = step === STEPS.length - 1
   const dept = deptId === ALL ? null : deptById(data, deptId)
 
@@ -95,15 +97,15 @@ export default function AdminWizard({ college, deptId = ALL, onGenerated, initia
           <Button onClick={() => setImporting(true)}>
             <FileUp className="h-4 w-4" /> Import college data
           </Button>
-          <Button variant="secondary" onClick={() => { loadGndec(); setFailures([]) }}>
+          <Button variant="secondary" onClick={() => { if (sure('Replace')) { loadGndec(); setFailures([]) } }}>
             Load GNDEC demo (CSE + sample departments)
           </Button>
-          <Button variant="secondary" onClick={() => { loadDemo(); setFailures([]) }}>
+          <Button variant="secondary" onClick={() => { if (sure('Replace')) { loadDemo(); setFailures([]) } }}>
             Load demo college
           </Button>
           <Button
             variant="danger"
-            onClick={() => window.confirm('Clear all college data?') && (reset(), setFailures([]), setStep(0))}
+            onClick={() => (college.shared ? sure('Clear') : window.confirm('Clear all college data?')) && (reset(), setFailures([]), setStep(0))}
           >
             Clear all
           </Button>

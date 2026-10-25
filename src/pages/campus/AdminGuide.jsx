@@ -17,8 +17,8 @@ function ReviewCard({ college, request }) {
   const past = isPast(request)
   const confirmRoom = review.available ? request.roomId : roomId
 
-  const decide = (decision) => {
-    const r = college.decideRequest(request.id, decision, { note: note.trim(), roomId: confirmRoom || undefined })
+  const decide = async (decision) => {
+    const r = await college.decideRequest(request.id, decision, { note: note.trim(), roomId: confirmRoom || undefined })
     if (!r.ok) setError(`Can't confirm: ${r.reasons.map((x) => x.text).join('; ')}.`)
   }
 

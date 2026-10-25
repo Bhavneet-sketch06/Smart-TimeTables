@@ -12,7 +12,7 @@ const SUBTITLES = {
 }
 
 /** Campus Guide: one name for every role; each role sees only its own screen and data. */
-export default function CampusGuide({ role, college, deptId }) {
+export default function CampusGuide({ role, college, deptId, teacherId, sectionId, clientId }) {
   return (
     <div className="space-y-5">
       <div>
@@ -23,8 +23,8 @@ export default function CampusGuide({ role, college, deptId }) {
       </div>
       {role === 'admin' && <AdminGuide college={college} />}
       {role === 'hod' && <HodGuide college={college} deptId={deptId} />}
-      {role === 'faculty' && <FacultyGuide college={college} deptId={deptId} />}
-      {role === 'student' && <StudentGuide college={college} deptId={deptId} />}
+      {role === 'faculty' && <FacultyGuide college={college} deptId={deptId} teacherId={teacherId} />}
+      {role === 'student' && <StudentGuide college={college} deptId={deptId} sectionId={sectionId} clientId={clientId} />}
     </div>
   )
 }

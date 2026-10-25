@@ -2,6 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { MessageCircle, RotateCcw, SendHorizontal, Sparkles, X } from 'lucide-react'
 import { buildTimetableContext } from '../chat/timetableContext.js'
 import { ALL, deptById, sectionsOf, teachersOf } from '../data/departments.js'
+import { supabase } from '../lib/supabase.js'
+
+/** With accounts, the assistant endpoint only answers signed-in users with access: send the session token. */
+async function authHeaders() {
+  if (!supabase) return {}
+  const { data } = await supabase.auth.getSession()
+  return data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {}
+}
 
 function suggestionsFor(data, deptId) {
   const sec = sectionsOf(data, deptId)[0]?.name
@@ -52,7 +60,7 @@ export default function ChatWidget({ data, deptId = ALL }) {
       abortRef.current = new AbortController()
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({ messages: history, context }),
         signal: abortRef.current.signal,
       })

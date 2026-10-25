@@ -66,23 +66,26 @@ function NextClass({ data, section, group }) {
   )
 }
 
-/** Student Campus Guide: next class, find a space for a student activity, and their own requests. */
-export default function StudentGuide({ college, deptId = ALL }) {
+/**
+ * Student Campus Guide: next class, find a space for a student activity, and their own requests.
+ * Signed-in students pass their `sectionId` and account id (`clientId`); the database fills in the requester.
+ */
+export default function StudentGuide({ college, deptId = ALL, sectionId, clientId: accountId }) {
   const { data, requestSpace, withdrawRequest } = college
   const pick = readPick()
   const sections = sectionsOf(data, deptId)
-  const section = sections.find((s) => s.id === pick.section) ?? sections[0]
+  const section = sectionId ? data.sections.find((s) => s.id === sectionId) : sections.find((s) => s.id === pick.section) ?? sections[0]
   const dept = (data.departments ?? []).find((d) => d.id === section?.deptId)
-  const clientId = studentClientId()
+  const clientId = accountId ?? studentClientId()
   const mine = (data.requests ?? []).filter((r) => r.requester?.role === 'student' && r.requester.clientId === clientId)
 
-  const onAction = (room, req) => {
+  const onAction = async (room, req) => {
     try {
       localStorage.setItem(NAME_KEY, req.organizerName.trim())
     } catch {
       // remembering the name is optional
     }
-    requestSpace(
+    const sent = await requestSpace(
       createRequest({ ...req, department: dept?.short ?? '', deptId: dept?.id }, room, {
         role: 'student',
         name: req.organizerName.trim(),
@@ -91,6 +94,7 @@ export default function StudentGuide({ college, deptId = ALL }) {
         deptId: dept?.id,
       }),
     )
+    if (sent?.ok === false) return { ok: false, message: `Request not sent: ${sent.reasons.map((r) => r.text).join('; ')}` }
     return { ok: true, message: `Request sent for ${room.name}. It is not confirmed yet: you'll see "Confirmed" or "Declined" under My requests once the administrator decides.` }
   }
 

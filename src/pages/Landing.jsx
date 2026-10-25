@@ -157,7 +157,11 @@ function ProductPreview() {
 // Staggered entrance for the hero: each element fades up a little after the one before.
 const delay = (ms) => ({ animationDelay: `${ms}ms` })
 
-export default function Landing({ onSelect, lastRole, controls }) {
+/**
+ * Public landing page. In the browser-only demo the role cards open each role; with accounts (`accounts`), every
+ * call to action leads to sign-in, since the role comes from the account, not from a choice made here.
+ */
+export default function Landing({ onSelect, lastRole, controls, accounts = false }) {
   return (
     <div className="min-h-screen overflow-x-hidden bg-white">
       <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/75 backdrop-blur-md">
@@ -180,7 +184,17 @@ export default function Landing({ onSelect, lastRole, controls }) {
               </a>
             ))}
           </nav>
-          <div>{controls}</div>
+          <div className="flex items-center gap-2">
+            {controls}
+            {accounts && (
+              <button
+                onClick={() => onSelect()}
+                className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+              >
+                Sign in
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -214,14 +228,16 @@ export default function Landing({ onSelect, lastRole, controls }) {
                   onClick={() => onSelect('admin')}
                   className="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-3.5 font-semibold text-white shadow-lg shadow-indigo-600/30 transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-600/40"
                 >
-                  Create a timetable <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+                  {accounts ? 'Sign in' : 'Create a timetable'} <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
                 </button>
-                <button
-                  onClick={() => onSelect('student')}
-                  className="rounded-xl border border-slate-300 bg-white/80 px-6 py-3.5 font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-md"
-                >
-                  View my timetable
-                </button>
+                {!accounts && (
+                  <button
+                    onClick={() => onSelect('student')}
+                    className="rounded-xl border border-slate-300 bg-white/80 px-6 py-3.5 font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-md"
+                  >
+                    View my timetable
+                  </button>
+                )}
               </div>
               {lastRole && (
                 <button
@@ -236,7 +252,7 @@ export default function Landing({ onSelect, lastRole, controls }) {
                 {[
                   [ShieldCheck, 'Zero clashes'],
                   [FlaskConical, 'Labs & groups'],
-                  [Lock, 'Data stays in your browser'],
+                  [Lock, accounts ? 'Invite-only, role-based access' : 'Data stays in your browser'],
                 ].map(([Icon, label]) => (
                   <li key={label} className="inline-flex items-center gap-1.5">
                     <Icon className="h-4 w-4 text-indigo-500" /> {label}
@@ -269,7 +285,7 @@ export default function Landing({ onSelect, lastRole, controls }) {
                     <span className="mt-5 text-xl font-semibold text-slate-900">{title}</span>
                     <span className="mt-1 text-slate-500">{text}</span>
                     <span className="mt-6 inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 opacity-70 transition group-hover:opacity-100">
-                      Open <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+                      {accounts ? 'Sign in' : 'Open'} <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
                     </span>
                   </button>
                 </Reveal>
@@ -337,7 +353,7 @@ export default function Landing({ onSelect, lastRole, controls }) {
                 onClick={() => onSelect('admin')}
                 className="group relative mt-8 inline-flex items-center gap-2 rounded-xl bg-[#ffffff] px-6 py-3.5 font-semibold text-[#4338ca] shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl"
               >
-                Get started <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+                {accounts ? 'Sign in' : 'Get started'} <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
               </button>
             </div>
           </Reveal>
@@ -350,7 +366,7 @@ export default function Landing({ onSelect, lastRole, controls }) {
             <CalendarDays className="h-4 w-4 text-indigo-600" /> Smart TimeTables
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <Lock className="h-3.5 w-3.5" /> Your data stays in your browser.
+            <Lock className="h-3.5 w-3.5" /> {accounts ? 'Each account sees only what its role allows.' : 'Your data stays in your browser.'}
           </span>
         </div>
       </footer>

@@ -32,10 +32,13 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
 /**
  * A faculty member's weekly schedule. The name list is the selected department's teachers; the schedule
  * itself spans every department they teach in, and the "Year / class" menu narrows it to one batch.
+ * `teacherId` (signed-in faculty) fixes whose schedule it is: there is no name list then.
  */
-export default function FacultyView({ data, deptId = ALL }) {
+export default function FacultyView({ data, deptId = ALL, teacherId }) {
   const [pick, setPick] = useState(readPick)
-  const teachers = [...teachersOf(data, deptId)].sort(byName)
+  const own = teacherId ? data.teachers.find((t) => t.id === teacherId) : null
+  const teachers = teacherId ? (own ? [own] : []) : [...teachersOf(data, deptId)].sort(byName)
+  if (teacherId && !own) return <EmptyState>Your faculty record is no longer in the college data. Ask your administrator.</EmptyState>
   if (!data.timetable || teachers.length === 0) {
     return teachers.length === 0 && deptId !== ALL ? (
       <DepartmentEmpty data={data} deptId={deptId} />
@@ -54,7 +57,7 @@ export default function FacultyView({ data, deptId = ALL }) {
   }
 
   const sectionsById = new Map(data.sections.map((s) => [s.id, s]))
-  const teacher = teachers.find((t) => t.id === pick.teacherId) ?? teachers[0]
+  const teacher = own ?? teachers.find((t) => t.id === pick.teacherId) ?? teachers[0]
   const allEntries = data.timetable.entries.filter((e) => e.teacherId === teacher?.id)
 
   // Year / class options: every batch of the selected department (key "dept::batch"), plus classes this
@@ -77,13 +80,20 @@ export default function FacultyView({ data, deptId = ALL }) {
   return (
     <div className="space-y-4">
       <DataNote data={data} />
-      <Card className="grid gap-4 sm:grid-cols-[2fr_1fr] print:hidden">
-        <Select
-          label="Your name"
-          value={teacher?.id ?? ''}
-          options={teachers.map((t) => ({ value: t.id, label: `${t.name} (${t.department || 'no department'})` }))}
-          onChange={(e) => save({ teacherId: e.target.value })}
-        />
+      <Card className={`grid gap-4 print:hidden ${own ? 'sm:grid-cols-2' : 'sm:grid-cols-[2fr_1fr]'}`}>
+        {own ? (
+          <div className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-slate-600">Signed in as</span>
+            <span className="py-1.5 text-base font-semibold text-slate-900">{own.name}</span>
+          </div>
+        ) : (
+          <Select
+            label="Your name"
+            value={teacher?.id ?? ''}
+            options={teachers.map((t) => ({ value: t.id, label: `${t.name} (${t.department || 'no department'})` }))}
+            onChange={(e) => save({ teacherId: e.target.value })}
+          />
+        )}
         <Select
           label="Year / class"
           value={year}
@@ -109,7 +119,7 @@ export default function FacultyView({ data, deptId = ALL }) {
               ? `No classes in ${yearLabel} this week`
               : `${yearLabel || 'All my classes'} · weekly teaching schedule`
           }
-          stats={`${plural(periodsOf(entries), 'period')} · ${plural(sectionCount, 'section')} · total load ${periodsOf(allEntries)} / ${teacher.maxHours}`}
+          stats={`${plural(periodsOf(entries), 'period')} · ${plural(sectionCount, 'section')} · total load ${periodsOf(allEntries)}${teacher.maxHours ? ` / ${teacher.maxHours}` : ''}`}
         />
       )}
     </div>

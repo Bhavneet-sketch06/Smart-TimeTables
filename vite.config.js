@@ -20,6 +20,10 @@ export default defineConfig(({ mode }) => {
   // so Vite never puts it in the browser bundle.
   const env = loadEnv(mode, process.cwd(), '')
   if (env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_API_KEY) process.env.ANTHROPIC_API_KEY = env.ANTHROPIC_API_KEY
+  // The dev API checks the caller's Supabase session against the same (public) project URL and publishable key.
+  for (const name of ['VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLISHABLE_KEY']) {
+    if (env[name] && !process.env[name]) process.env[name] = env[name]
+  }
 
   return {
     plugins: [react(), tailwindcss(), apiDevServer()],

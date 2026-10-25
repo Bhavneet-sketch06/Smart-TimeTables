@@ -57,22 +57,29 @@ export function nextWorkingDay(data, today = new Date()) {
 
 // ---------- what occupies a room ----------
 
-/** Regular classes held in a room on a given date (the weekly timetable repeats every week). */
+/**
+ * Regular classes held in a room on a given date (the weekly timetable repeats every week). With shared data,
+ * classes the user may not see in detail come from data.busy.rooms and are labelled only "Class".
+ */
 export function classIntervals(data, roomId, date) {
   const day = data.time.days.indexOf(weekdayOf(date))
-  if (!data.timetable || day < 0) return []
+  if (day < 0) return []
   const { periods } = periodTimes(data.time)
   const subjects = new Map(data.subjects.map((s) => [s.id, s]))
   const sections = new Map(data.sections.map((s) => [s.id, s]))
-  return data.timetable.entries
+  const span = (e) => ({ from: toMinutes(periods[e.period].start), to: toMinutes(periods[e.period + e.length - 1].end) })
+  const visible = (data.timetable?.entries ?? [])
     .filter((e) => e.roomId === roomId && e.day === day)
     .map((e) => ({
-      from: toMinutes(periods[e.period].start),
-      to: toMinutes(periods[e.period + e.length - 1].end),
+      ...span(e),
       label: `${subjects.get(e.subjectId)?.name ?? 'Class'} ${e.kind} for ${sections.get(e.sectionId)?.name ?? '?'}${
         e.group ? ` (${e.group})` : ''
       }`,
     }))
+  const hidden = (data.busy?.rooms ?? [])
+    .filter((e) => e.roomId === roomId && e.day === day && periods[e.period + e.length - 1])
+    .map((e) => ({ ...span(e), label: 'Class' }))
+  return [...visible, ...hidden]
 }
 
 /** Confirmed bookings of a room on a date, as held intervals (buffers included). */
@@ -80,6 +87,13 @@ export function bookingIntervals(bookings, roomId, date, ignoreId) {
   return bookings
     .filter((b) => b.status === 'confirmed' && b.roomId === roomId && b.date === date && b.id !== ignoreId)
     .map((b) => ({ ...windowOf(b), label: `${b.title} (${b.eventType}, ${b.id})` }))
+}
+
+/** Other people's confirmed bookings of a room on a date (shared data: times only, from data.busy.holds). */
+export function holdIntervals(data, roomId, date) {
+  return (data.busy?.holds ?? [])
+    .filter((h) => h.roomId === roomId && h.date === date)
+    .map((h) => ({ ...windowOf(h), label: 'another booking' }))
 }
 
 // ---------- validation and room search ----------
@@ -123,7 +137,7 @@ export function checkRoom(data, bookings, room, req, ignoreId) {
   for (const c of classIntervals(data, room.id, req.date)) {
     if (overlaps(held, c)) reasons.push({ kind: 'class', text: `Class ${toHHMM(c.from)}–${toHHMM(c.to)}: ${c.label}` })
   }
-  for (const b of bookingIntervals(bookings, room.id, req.date, ignoreId)) {
+  for (const b of [...bookingIntervals(bookings, room.id, req.date, ignoreId), ...holdIntervals(data, room.id, req.date)]) {
     if (overlaps(held, b)) reasons.push({ kind: 'booking', text: `Booked ${toHHMM(b.from)}–${toHHMM(b.to)}: ${b.label}` })
   }
   return { room, available: reasons.length === 0, reasons }

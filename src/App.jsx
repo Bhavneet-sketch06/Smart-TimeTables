@@ -1,26 +1,24 @@
 import { useEffect, useState } from 'react'
+import { AlertTriangle, CalendarDays, CheckCircle2, Loader2, LogOut } from 'lucide-react'
 import { useCollegeData } from './hooks/useCollegeData.js'
+import { useRemoteCollege } from './hooks/useRemoteCollege.js'
 import { usePrefs } from './hooks/usePrefs.js'
+import { useAuth } from './auth/useAuth.js'
+import { localDemoAllowed, supabaseConfigured } from './lib/supabase.js'
 import PrefsControls from './components/PrefsControls.jsx'
 import Landing from './pages/Landing.jsx'
-import { CalendarDays, CalendarPlus, ClipboardList, Compass, LayoutGrid, Settings2, Ticket, UserRound } from 'lucide-react'
-import { Button, Tabs } from './components/ui.jsx'
+import { Button, EmptyState } from './components/ui.jsx'
 import ChatWidget from './components/ChatWidget.jsx'
 import DepartmentBar, { HodDepartmentPicker } from './components/DepartmentBar.jsx'
-import AdminWizard, { generateDepartment } from './pages/admin/AdminWizard.jsx'
-import TimetableViews from './pages/TimetableViews.jsx'
-import FacultyView, { currentFacultyId } from './pages/FacultyView.jsx'
-import StudentView from './pages/StudentView.jsx'
-import CampusGuide from './pages/campus/CampusGuide.jsx'
-import BookSpace from './pages/booking/BookSpace.jsx'
-import BookingsList from './pages/booking/BookingsList.jsx'
-import { upcomingBookings } from './booking.js'
+import { AdminPage, FacultyPage, HodPage, StudentPage } from './pages/RolePages.jsx'
+import { AccessPending, LoadError, NotConfigured, SetPassword, SignIn, Splash } from './pages/auth/AuthScreens.jsx'
 import { ALL, deptById } from './data/departments.js'
 
 const ROLE_KEY = 'ttgen:role'
 const DEPT_KEY = 'ttgen:dept'
 const HOD_KEY = 'ttgen:hodDept'
 const ROLE_LABELS = { admin: 'Administrator', hod: 'HOD / Coordinator', faculty: 'Faculty', student: 'Student' }
+const PAGES = { admin: AdminPage, hod: HodPage, faculty: FacultyPage, student: StudentPage }
 
 const readKey = (key, fallback) => {
   try {
@@ -42,16 +40,175 @@ const readRole = () => {
   return ROLE_LABELS[role] ? role : 'landing'
 }
 
+/**
+ * With Supabase configured, people sign in and their role comes from their profile in the database.
+ * Without it, the browser-only demo runs during development (or when VITE_LOCAL_DEMO=true); otherwise nothing.
+ */
 export default function App() {
+  const [prefs, setPrefs] = usePrefs()
+  const controls = <PrefsControls prefs={prefs} setPrefs={setPrefs} />
+  if (supabaseConfigured) return <AccountsApp controls={controls} />
+  if (localDemoAllowed) return <LocalDemoApp controls={controls} />
+  return <NotConfigured controls={controls} />
+}
+
+function Brand({ onClick, children }) {
+  const Tag = onClick ? 'button' : 'div'
+  return (
+    <Tag onClick={onClick} className="flex items-center gap-2">
+      <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-600 text-white">
+        <CalendarDays className="h-5 w-5" />
+      </span>
+      <span className="text-lg font-bold">Smart TimeTables</span>
+      {children}
+    </Tag>
+  )
+}
+
+function RoleBadge({ role, data, deptId }) {
+  return (
+    <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-sm font-medium text-indigo-700">
+      {ROLE_LABELS[role]}
+      {deptId && deptId !== ALL && (data.departments ?? []).length > 0 && ` · ${deptById(data, deptId)?.short ?? '?'}`}
+    </span>
+  )
+}
+
+// ---------- signed-in app ----------
+
+function AccountsApp({ controls }) {
+  const auth = useAuth()
+  const [signingIn, setSigningIn] = useState(false)
+  if (auth.loading) return <Splash text="Restoring your session…" />
+  if (!auth.session) {
+    return signingIn ? (
+      <SignIn auth={auth} controls={controls} onBack={() => setSigningIn(false)} />
+    ) : (
+      <Landing accounts onSelect={() => setSigningIn(true)} controls={controls} />
+    )
+  }
+  if (auth.needsPassword) return <SetPassword auth={auth} controls={controls} />
+  if (auth.profile.status === 'loading') return <Splash text="Checking your access…" />
+  const p = auth.profile.row
+  if (auth.profile.status === 'error' || !p || !p.active || p.role === 'pending' || !PAGES[p.role]) {
+    return <AccessPending auth={auth} controls={controls} />
+  }
+  // A new role or scope gets a fresh workspace (and a fresh data load) rather than reusing the old one.
+  return <Workspace key={[p.user_id, p.role, p.dept_id, p.teacher_id, p.section_id].join('|')} auth={auth} profile={p} controls={controls} />
+}
+
+/** Saving status of an administrator's setup edits. */
+function SaveStatus({ college }) {
+  const { saving, error, savedAt } = college.saveState
+  if (saving) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-sm text-slate-500">
+        <Loader2 className="h-4 w-4 animate-spin" /> Saving…
+      </span>
+    )
+  }
+  if (error) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-sm text-red-700" title={error}>
+        <AlertTriangle className="h-4 w-4" /> Not saved
+        <Button variant="ghost" className="px-2 py-1" onClick={college.retrySave}>
+          Retry
+        </Button>
+      </span>
+    )
+  }
+  if (!savedAt) return null
+  return (
+    <span className="hidden items-center gap-1.5 text-sm text-slate-500 sm:inline-flex">
+      <CheckCircle2 className="h-4 w-4 text-emerald-600" /> Saved
+    </span>
+  )
+}
+
+function Workspace({ auth, profile, controls }) {
+  const role = profile.role
+  const college = useRemoteCollege(profile)
+  const { data } = college
+  const [dept, setDept] = useState(() => readKey(DEPT_KEY, ''))
+  useEffect(() => {
+    if (role === 'admin') writeKey(DEPT_KEY, dept)
+  }, [role, dept])
+
+  if (!data) {
+    return college.status.error ? (
+      <LoadError message={college.status.error} onRetry={college.reload} onSignOut={auth.signOut} controls={controls} />
+    ) : (
+      <Splash text="Loading your college…" />
+    )
+  }
+
+  // Administrators pick any department or the whole college; everyone else is fixed to the account's department.
+  const departments = data.departments ?? []
+  const validDept = (id) => departments.some((d) => d.id === id)
+  const deptId = role === 'admin' ? (dept === ALL || validDept(dept) ? dept : departments[0]?.id ?? ALL) : profile.dept_id
+  const me = { userId: profile.user_id, email: profile.email, teacherId: profile.teacher_id, sectionId: profile.section_id }
+  const Page = PAGES[role]
+  const scopeMissing = role !== 'admin' && !validDept(deptId)
+
+  return (
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur print:hidden">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6 lg:px-8">
+          <Brand>
+            <RoleBadge role={role} data={data} deptId={deptId} />
+          </Brand>
+          <div className="flex flex-wrap items-center gap-2">
+            {role === 'admin' && <SaveStatus college={college} />}
+            {controls}
+            <span className="hidden max-w-56 truncate text-sm text-slate-500 md:inline" title={profile.email}>
+              {profile.display_name || profile.email}
+            </span>
+            <Button variant="secondary" onClick={auth.signOut}>
+              <LogOut className="h-4 w-4" /> Sign out
+            </Button>
+          </div>
+        </div>
+      </header>
+      <main className="w-full px-4 pb-28 pt-6 sm:px-6 lg:px-8 print:p-0">
+        {college.status.error && (
+          <p className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 print:hidden">
+            <AlertTriangle className="h-4 w-4 shrink-0" /> {college.status.error}
+            <Button variant="ghost" className="ml-auto px-2 py-1" onClick={college.reload}>
+              Reload
+            </Button>
+          </p>
+        )}
+        {scopeMissing ? (
+          <EmptyState>Your department is not in the college data yet. Ask your administrator.</EmptyState>
+        ) : (
+          <>
+            <DepartmentBar
+              data={data}
+              value={deptId}
+              onChange={setDept}
+              allowAll={role === 'admin'}
+              locked={role !== 'admin'}
+              lockedLabel="Your department"
+            />
+            <Page college={college} deptId={deptId} me={me} />
+          </>
+        )}
+      </main>
+      <ChatWidget data={data} deptId={deptId} />
+    </div>
+  )
+}
+
+// ---------- browser-only demo (no accounts) ----------
+
+function LocalDemoApp({ controls }) {
   const college = useCollegeData()
   const { data } = college
   // The landing page always opens first; the last role used is offered there as a shortcut.
   const [view, setView] = useState('landing')
-  const [prefs, setPrefs] = usePrefs()
   // One department context for the whole app, remembered across views and reloads.
   const [dept, setDept] = useState(() => readKey(DEPT_KEY, ''))
   const [hodDept, setHodDept] = useState(() => readKey(HOD_KEY, ''))
-  const prefsControls = <PrefsControls prefs={prefs} setPrefs={setPrefs} />
 
   useEffect(() => {
     if (view !== 'landing') writeKey(ROLE_KEY, view)
@@ -65,7 +222,7 @@ export default function App() {
       <Landing
         onSelect={setView}
         lastRole={ROLE_LABELS[lastRole] ? { id: lastRole, label: ROLE_LABELS[lastRole] } : null}
-        controls={prefsControls}
+        controls={controls}
       />
     )
   }
@@ -82,23 +239,20 @@ export default function App() {
       : view === 'hod'
         ? hodAssigned
         : validDept(dept) ? dept : firstDept
+  const Page = PAGES[view]
 
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur print:hidden">
         <div className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6 lg:px-8">
-          <button onClick={() => setView('landing')} className="flex items-center gap-2">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-600 text-white">
-              <CalendarDays className="h-5 w-5" />
+          <Brand onClick={() => setView('landing')}>
+            <RoleBadge role={view} data={data} deptId={effective} />
+            <span className="hidden rounded-full bg-amber-100 px-2.5 py-0.5 text-sm font-medium text-amber-800 sm:inline">
+              Browser-only demo
             </span>
-            <span className="text-lg font-bold">Smart TimeTables</span>
-            <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-sm font-medium text-indigo-700">
-              {ROLE_LABELS[view]}
-              {effective && effective !== ALL && departments.length > 0 && ` · ${deptById(data, effective)?.short}`}
-            </span>
-          </button>
+          </Brand>
           <div className="flex items-center gap-2">
-            {prefsControls}
+            {controls}
             <Button variant="secondary" onClick={() => setView('landing')}>
               Switch role
             </Button>
@@ -118,199 +272,11 @@ export default function App() {
               locked={view === 'hod'}
               onUnlock={() => setHodDept('')}
             />
-            
-            {view === 'admin' && <AdminPage college={college} deptId={effective} />}
-            {view === 'hod' && <HodPage college={college} deptId={effective} />}
-            {view === 'faculty' && <FacultyPage college={college} deptId={effective} />}
-            {view === 'student' && <StudentPage college={college} deptId={effective} />}
+            <Page college={college} deptId={effective} me={null} />
           </>
         )}
       </main>
       <ChatWidget data={data} deptId={effective} />
-    </div>
-  )
-}
-
-const BOOK_TAB = { id: 'book', label: 'Book a space', Icon: CalendarPlus }
-const GUIDE_TAB = { id: 'guide', label: 'Campus Guide', Icon: Compass }
-
-/** Booking tabs shared by every role that can book rooms. */
-function BookingTabs({ tab, setTab, college, deptId, organizer, createdBy, mine, listTitle, canCancel }) {
-  const all = college.data.bookings ?? []
-  const shown = mine ? all.filter(mine) : all
-  if (tab === 'book') {
-    return (
-      <BookSpace
-        college={college}
-        deptId={deptId === ALL ? undefined : deptId}
-        organizer={organizer}
-        createdBy={createdBy}
-        onViewBookings={() => setTab('bookings')}
-      />
-    )
-  }
-  if (tab === 'bookings') {
-    return (
-      <BookingsList
-        data={college.data}
-        bookings={shown}
-        title={listTitle}
-        canCancel={canCancel}
-        onCancel={college.cancelBooking}
-        onAddSamples={all.length === 0 && college.data.rooms.length ? college.addSampleBookings : undefined}
-      />
-    )
-  }
-  return null
-}
-
-/** Bookings made for a department (falls back to its short name for bookings made before departments). */
-const bookingInDept = (data, deptId) => (b) =>
-  deptId === ALL || b.deptId === deptId || (!b.deptId && b.department === deptById(data, deptId)?.short)
-
-function AdminPage({ college, deptId }) {
-  const [tab, setTab] = useState(college.data.timetable ? 'timetable' : 'setup')
-  const [failures, setFailures] = useState([])
-  // With one department selected, only that department's bookings are listed and counted.
-  const inDept = bookingInDept(college.data, deptId)
-  const deptShort = deptId === ALL ? '' : deptById(college.data, deptId)?.short ?? ''
-  const bookingsLabel = deptShort ? `${deptShort} bookings` : 'All bookings'
-  const upcoming = upcomingBookings((college.data.bookings ?? []).filter(inDept)).length
-  const pendingRequests = (college.data.requests ?? []).filter((r) => r.status === 'pending').length
-  const generateHere = () => {
-    const r = generateDepartment(college.data, deptId)
-    setFailures(r.failures)
-    if (r.timetable) college.setTimetable(r.timetable)
-    else {
-      setTab('setup')
-    }
-  }
-  return (
-    <div className="space-y-5">
-      <Tabs
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { id: 'setup', label: 'Setup', Icon: Settings2 },
-          { id: 'timetable', label: 'Timetable', Icon: LayoutGrid },
-          { ...GUIDE_TAB, badge: pendingRequests },
-          BOOK_TAB,
-          { id: 'bookings', label: bookingsLabel, Icon: Ticket, badge: upcoming },
-        ]}
-      />
-      {tab === 'guide' && <CampusGuide role="admin" college={college} deptId={deptId} />}
-      {tab === 'setup' && (
-        <AdminWizard college={college} deptId={deptId} initialFailures={failures} onGenerated={() => (setFailures([]), setTab('timetable'))} />
-      )}
-      {tab === 'timetable' && (
-        <TimetableViews
-          data={college.data}
-          deptId={deptId}
-          canManage
-          onSetup={() => setTab('setup')}
-          onGenerate={deptId === ALL ? () => setTab('setup') : generateHere}
-        />
-      )}
-      <BookingTabs
-        tab={tab}
-        setTab={setTab}
-        college={college}
-        deptId={deptId}
-        key={deptId}
-        createdBy={{ role: 'admin' }}
-        mine={deptId === ALL ? undefined : inDept}
-        listTitle={bookingsLabel}
-        canCancel={() => true}
-      />
-    </div>
-  )
-}
-
-function HodPage({ college, deptId }) {
-  const [tab, setTab] = useState('timetables')
-  const inDept = bookingInDept(college.data, deptId)
-  const upcoming = upcomingBookings((college.data.bookings ?? []).filter(inDept)).length
-  const short = deptById(college.data, deptId)?.short ?? ''
-  return (
-    <div className="space-y-5">
-      <Tabs
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { id: 'timetables', label: 'Timetables', Icon: ClipboardList },
-          GUIDE_TAB,
-          BOOK_TAB,
-          { id: 'bookings', label: `${short} bookings`, Icon: Ticket, badge: upcoming },
-        ]}
-      />
-      {tab === 'timetables' && <TimetableViews data={college.data} deptId={deptId} />}
-      {tab === 'guide' && <CampusGuide role="hod" college={college} deptId={deptId} />}
-      {/* Coordinators see and cancel their department's bookings. */}
-      <BookingTabs
-        tab={tab}
-        setTab={setTab}
-        college={college}
-        deptId={deptId}
-        key={deptId}
-        createdBy={{ role: 'hod', deptId }}
-        mine={inDept}
-        listTitle={`${short} bookings`}
-        canCancel={() => true}
-      />
-    </div>
-  )
-}
-
-function FacultyPage({ college, deptId }) {
-  const [tab, setTab] = useState('timetable')
-  // The faculty member picked on the "My timetable" tab is "you" for booking.
-  const teacherId = currentFacultyId(college.data, deptId)
-  const teacher = college.data.teachers.find((t) => t.id === teacherId)
-  const isMine = (b) => b.organizerId === teacherId || b.createdBy?.teacherId === teacherId
-  const upcoming = upcomingBookings((college.data.bookings ?? []).filter(isMine)).length
-  return (
-    <div className="space-y-5">
-      <Tabs
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { id: 'timetable', label: 'My timetable', Icon: UserRound },
-          { id: 'department', label: 'Department timetable', Icon: LayoutGrid },
-          GUIDE_TAB,
-          BOOK_TAB,
-          { id: 'bookings', label: 'My bookings', Icon: Ticket, badge: upcoming },
-        ]}
-      />
-      {tab === 'timetable' && <FacultyView data={college.data} deptId={deptId} />}
-      {tab === 'department' && <TimetableViews data={college.data} deptId={deptId} showSummary={false} />}
-      {tab === 'guide' && <CampusGuide role="faculty" college={college} deptId={deptId} />}
-      <BookingTabs
-        key={`${teacherId}:${deptId}`}
-        tab={tab}
-        setTab={setTab}
-        college={college}
-        deptId={deptId}
-        organizer={teacher}
-        createdBy={{ role: 'faculty', teacherId }}
-        mine={isMine}
-        listTitle={teacher ? `My bookings · ${teacher.name}` : 'My bookings'}
-        canCancel={isMine}
-      />
-    </div>
-  )
-}
-
-function StudentPage({ college, deptId }) {
-  const [tab, setTab] = useState('timetable')
-  return (
-    <div className="space-y-5">
-      <Tabs
-        value={tab}
-        onChange={setTab}
-        tabs={[{ id: 'timetable', label: 'My timetable', Icon: CalendarDays }, GUIDE_TAB]}
-      />
-      {tab === 'timetable' && <StudentView data={college.data} deptId={deptId} />}
-      {tab === 'guide' && <CampusGuide role="student" college={college} deptId={deptId} />}
     </div>
   )
 }

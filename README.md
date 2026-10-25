@@ -1,13 +1,20 @@
 # College Timetable Generator
 
-Generate clash-free weekly timetables for any college, entirely in the browser. No backend, no login: data is saved in your browser's localStorage.
+Generate clash-free weekly timetables for any college. Timetables are generated in the browser; with Supabase
+configured, people **sign in** (invite-only) and share one college database, and each account sees only what its
+role allows (enforced by Row Level Security in the database).
 
 ## Try it
 ```bash
 npm install
 npm run dev
 ```
-Open http://localhost:5173 → **Administrator** → **Load GNDEC demo (CSE + sample departments)** or **Load demo college** → go to **Sections** → **Generate whole college**.
+- **With accounts** (Supabase): follow [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md) (env variables, migrations,
+  first administrator, inviting users). Sign in as administrator → **Setup** → **Load GNDEC demo** → **Sections** →
+  **Generate whole college**.
+- **Browser-only demo** (no Supabase values in `.env.local`): open http://localhost:5173 → **Administrator** →
+  **Load GNDEC demo (CSE + sample departments)** or **Load demo college** → **Sections** → **Generate whole college**.
+  Data stays in that browser and anyone can pick any role; it is for trying the app, not for real use.
 
 Use the ☀️ / 🌙 / 💻 switch for light, dark or system theme.
 
@@ -20,11 +27,15 @@ well under a second with zero clashes. It is a realistic sample, **not** the off
 Every timetable has a **Print** button that prints just the timetable on one A4 landscape page.
 
 ## Departments
-After choosing a role, pick a department from the department bar (CSE, ECE, ME, Civil, EE in the GNDEC demo).
-Everything follows that choice: timetables, setup lists, generation, faculty and student pickers, bookings.
+The department bar (CSE, ECE, ME, Civil, EE in the GNDEC demo) sets the context for timetables, setup lists,
+generation and bookings.
 - **Administrator**: any department or *All departments*; can set up and generate one department or the whole college.
-- **HOD / Coordinator**: picks the department they coordinate once (demo assignment) and only sees that department.
-- **Faculty / Student**: pick their department; faculty still see their full week if they teach in several departments.
+- **HOD / Coordinator**: their assigned department only.
+- **Faculty / Student**: their assigned department; faculty still see their full week if they teach in several departments.
+
+With accounts, the department (and the faculty identity or student section) comes from the account's profile, set by
+an administrator in the **Users** tab; nobody can choose or change their own. In the browser-only demo these are
+picked on screen instead.
 
 Rooms are shared college-wide. Generating one department keeps every other department's classes and works around
 their rooms and shared teachers, so a room can never be double-booked across departments. In the GNDEC demo, CSE is
@@ -50,10 +61,12 @@ the API key is never sent to the browser.
 3. On Vercel: Project → Settings → Environment Variables → add `ANTHROPIC_API_KEY`, then redeploy.
 
 ## Roles
-- **Administrator**: 5-step setup wizard (time structure → rooms → subjects → teachers → sections), then generate and review.
-- **HOD / Coordinator**: timetables by section, teacher or room, filtered by department, with clash count and quality score.
-- **Faculty**: pick your name (and optionally a year/class such as D2 or D3) to see your weekly schedule and load.
-- **Student**: pick department and section to see a read-only, mobile-friendly timetable.
+- **Administrator**: 5-step setup wizard (time structure → rooms → subjects → teachers → sections), then generate and
+  review; reviews space requests; with accounts, assigns roles in **Users**.
+- **HOD / Coordinator**: their department's timetables by section, teacher or room, with clash count and quality
+  score; joint free times with other departments (free/busy only).
+- **Faculty**: their own weekly schedule (optionally one year/class such as D2 or D3) and their department's timetables.
+- **Student**: their section's read-only, mobile-friendly timetable; requests rooms for student activities.
 
 ## How the scheduler works (`src/scheduler.js`)
 1. **Pre-check** catches impossible input up front (over-loaded teachers, rooms too small, labs longer than the gap between breaks, not enough lab blocks) and explains it in plain language.
@@ -69,9 +82,12 @@ The demo college (3 departments, 6 sections, 12 teachers, 8 rooms, 114 classes) 
 | Command | Purpose |
 |---|---|
 | `npm run dev` | dev server |
-| `npm test` | scheduler tests (Vitest) |
+| `npm test` | app tests and database RLS tests (Vitest, in-process Postgres) |
 | `npm run build` | production build to `dist/` |
 | `npm run preview` | serve the build |
 
 ## Deploy to Vercel
-Import the repo in Vercel; it detects Vite automatically (build `npm run build`, output `dist`). No environment variables or config needed.
+Import the repo in Vercel; it detects Vite automatically (build `npm run build`, output `dist`). Set
+`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` and `ANTHROPIC_API_KEY` in Project Settings → Environment
+Variables, and add the production URL to Supabase's Auth redirect URLs: see section 8 of
+[docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md). Never add the Supabase secret/service key.

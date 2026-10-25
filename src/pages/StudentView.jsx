@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { CalendarDays, Sun } from 'lucide-react'
-import { Card, Select } from '../components/ui.jsx'
+import { Card, EmptyState, Select } from '../components/ui.jsx'
 import TimetableSheet from '../components/TimetableSheet.jsx'
 import DepartmentEmpty, { departmentNeedsAttention } from '../components/DepartmentEmpty.jsx'
 import { ALL, batchOf, batchesOf, deptById, sectionsOf } from '../data/departments.js'
@@ -55,11 +55,15 @@ function ViewSwitch({ value, onChange }) {
 /**
  * A student's read-only timetable: department (from the department bar) → semester → section → lab group.
  * "My Day" and "Full week" show the same choice, so switching keeps the department, semester, section and group.
+ * `sectionId` (signed-in student) fixes the section: only the lab group can be chosen then.
  */
-export default function StudentView({ data, deptId = ALL }) {
+export default function StudentView({ data, deptId = ALL, sectionId }) {
   const [pick, setPick] = useState(readPick)
   const [view, setView] = useState(readView)
-  if (departmentNeedsAttention(data, deptId)) return <DepartmentEmpty data={data} deptId={deptId} />
+  const own = sectionId ? data.sections.find((s) => s.id === sectionId) : null
+  if (sectionId && !own) return <EmptyState>Your section is no longer in the college data. Ask your administrator.</EmptyState>
+  if (!own && departmentNeedsAttention(data, deptId)) return <DepartmentEmpty data={data} deptId={deptId} />
+  if (own && !data.timetable) return <EmptyState>No timetable has been published yet. It appears here once the administrator generates it.</EmptyState>
 
   const changeView = (next) => {
     setView(next)
@@ -78,10 +82,10 @@ export default function StudentView({ data, deptId = ALL }) {
     }
   }
 
-  const batches = batchesOf(data, deptId)
-  const batch = batches.includes(pick.batch) ? pick.batch : batches[0]
-  const sections = sectionsOf(data, deptId).filter((s) => batchOf(s) === batch)
-  const section = sections.find((s) => s.id === pick.section) ?? sections[0]
+  const batches = own ? [batchOf(own)] : batchesOf(data, deptId)
+  const batch = own ? batchOf(own) : batches.includes(pick.batch) ? pick.batch : batches[0]
+  const sections = own ? [own] : sectionsOf(data, deptId).filter((s) => batchOf(s) === batch)
+  const section = own ?? sections.find((s) => s.id === pick.section) ?? sections[0]
   const groupNames = section && labGroupsOf(section) > 1 ? groupNamesOf(section) : []
   const group = groupNames.includes(pick.group) ? pick.group : ''
   // A chosen lab group sees its own labs plus all whole-section classes.
@@ -93,6 +97,26 @@ export default function StudentView({ data, deptId = ALL }) {
   return (
     <div className="space-y-4">
       <DataNote data={data} />
+      {own ? (
+        <Card className="flex flex-wrap items-end justify-between gap-3 print:hidden">
+          <div>
+            <div className="text-sm font-medium text-slate-600">Your section</div>
+            <div className="text-lg font-semibold text-slate-900">
+              {own.name}
+              {batch ? <span className="font-normal text-slate-500"> · {batch}</span> : null}
+            </div>
+          </div>
+          {groupNames.length > 0 && (
+            <Select
+              label="Lab group"
+              value={group}
+              options={[{ value: '', label: 'All groups' }].concat(groupNames)}
+              onChange={(e) => save({ ...pick, group: e.target.value })}
+              className="min-w-40"
+            />
+          )}
+        </Card>
+      ) : (
       <Card className={`grid gap-3 print:hidden ${groupNames.length ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
         {batches.length > 1 || batches[0] ? (
           <Select
@@ -118,6 +142,7 @@ export default function StudentView({ data, deptId = ALL }) {
           />
         )}
       </Card>
+      )}
       <ViewSwitch value={view} onChange={changeView} />
       {section && view === 'day' && (
         <MyDay

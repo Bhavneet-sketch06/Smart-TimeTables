@@ -77,9 +77,11 @@ function Chip({ active, onClick, children }) {
 
 /**
  * Book a room for a one-off event. `organizer` is the signed-in faculty member when known (pre-fills the form);
- * `createdBy` is stored on the booking so "My bookings" can find it.
+ * `createdBy` is stored on the booking so "My bookings" can find it. With accounts, `locked` fixes the organizer
+ * and/or department to the signed-in user's own, and `canBook(room)` limits direct booking to rooms the database
+ * lets them book (the rest need a request in the Campus Guide).
  */
-export default function BookSpace({ college, organizer, createdBy, deptId, onViewBookings }) {
+export default function BookSpace({ college, organizer, createdBy, deptId, onViewBookings, locked = {}, canBook }) {
   const { data, bookSpace } = college
   const [req, setReq] = useState(() => initialRequest(data, organizer, deptId))
   const [step, setStep] = useState(0)
@@ -94,10 +96,12 @@ export default function BookSpace({ college, organizer, createdBy, deptId, onVie
   const allFacilities = [...new Set(data.rooms.flatMap((r) => r.facilities || []))].sort()
   const bookings = data.bookings ?? []
 
-  const search = useMemo(() => (step >= 2 ? findSpaces(data, bookings, req) : null), [step, data, bookings, req])
+  const found = useMemo(() => (step >= 2 ? findSpaces(data, bookings, req) : null), [step, data, bookings, req])
+  const search = found && canBook ? { ...found, available: found.available.filter((r) => canBook(r.room)) } : found
+  const requestOnly = found && search ? found.available.length - search.available.length : 0
   const alternatives = useMemo(
     () => (search && search.available.length === 0 ? suggestAlternatives(data, bookings, req) : null),
-    [search, data, bookings, req],
+    [found, canBook, data, bookings, req],
   )
   const room = data.rooms.find((r) => r.id === roomId)
   const held = req.start && Number(req.duration) > 0 ? windowOf(req) : null
@@ -113,7 +117,7 @@ export default function BookSpace({ college, organizer, createdBy, deptId, onVie
     if (!stepErrors.length) setStep(step + 1)
   }
 
-  const confirm = () => {
+  const confirm = async () => {
     const v = validateRequest(req)
     if (v.details.length || v.schedule.length) {
       setErrors([...v.details, ...v.schedule])
@@ -121,7 +125,7 @@ export default function BookSpace({ college, organizer, createdBy, deptId, onVie
     }
     const booking = createBooking(req, room, createdBy)
     // Re-checks against the latest saved bookings, so two people can't take the same room and time.
-    const result = bookSpace(booking)
+    const result = await bookSpace(booking)
     if (!result.ok) {
       setConflict(`${room.name} is no longer free: ${result.reasons[0].text}. Please choose another space or time.`)
       setRoomId('')
@@ -227,6 +231,7 @@ export default function BookSpace({ college, organizer, createdBy, deptId, onVie
             <div className="grid gap-4 sm:grid-cols-3">
               <Select
                 label="Organizer"
+                disabled={locked.organizer}
                 value={req.organizerId || (req.organizerName ? '__other' : '')}
                 options={[{ value: '', label: 'Choose organizer…' }]
                   .concat(teachers.map((t) => ({ value: t.id, label: t.name })))
@@ -239,6 +244,7 @@ export default function BookSpace({ college, organizer, createdBy, deptId, onVie
               />
               <Select
                 label="Department"
+                disabled={locked.department}
                 value={req.department}
                 options={[...new Set([req.department, ...departments])].filter(Boolean)}
                 onChange={(e) => set({ department: e.target.value, deptId: (data.departments ?? []).find((d) => d.short === e.target.value)?.id ?? null })}
@@ -365,6 +371,13 @@ export default function BookSpace({ college, organizer, createdBy, deptId, onVie
               </span>
             </div>
 
+            {requestOnly > 0 && (
+              <p className="flex items-start gap-2 text-sm text-slate-600">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
+                {requestOnly} more free space{requestOnly === 1 ? ' is' : 's are'} shared or belong{requestOnly === 1 ? 's' : ''} to another
+                department: request {requestOnly === 1 ? 'it' : 'them'} in the Campus Guide.
+              </p>
+            )}
             {search.available.length > 0 ? (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {search.available.map(({ room: r }) => {

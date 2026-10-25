@@ -18,7 +18,7 @@ function SourceBadge({ dept }) {
  * The department context for the whole app: current department name plus department tabs.
  * `allowAll` adds a college-wide option (Administrator); `locked` shows a single fixed department (HOD).
  */
-export default function DepartmentBar({ data, value, onChange, allowAll = false, locked = false, onUnlock }) {
+export default function DepartmentBar({ data, value, onChange, allowAll = false, locked = false, onUnlock, lockedLabel = 'Your department (demo assignment)' }) {
   const departments = data.departments ?? []
   if (!departments.length) return null
   const current = value === ALL ? null : deptById(data, value)
@@ -42,7 +42,7 @@ export default function DepartmentBar({ data, value, onChange, allowAll = false,
         </div>
         {locked && (
           <div className="flex items-center gap-2 text-sm text-slate-500">
-            <Lock className="h-4 w-4" /> Your department (demo assignment)
+            <Lock className="h-4 w-4" /> {lockedLabel}
             {onUnlock && (
               <Button variant="ghost" onClick={onUnlock}>
                 Change

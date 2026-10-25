@@ -69,13 +69,13 @@ export default function SpaceFinder({ data, bookings, audience = 'public', initi
     [search],
   )
 
-  const act = (room) => {
+  const act = async (room) => {
     const problems = validateRequest(req).details.filter((p) => askName || !/organizer/.test(p))
     if (problems.length) {
       setResult({ ok: false, message: problems.join(' ') })
       return
     }
-    setResult(onAction(room, req))
+    setResult(await onAction(room, req))
   }
 
   return (
