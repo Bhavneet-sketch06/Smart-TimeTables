@@ -139,6 +139,9 @@ blocks only its own group, so groups can be in different labs at the same time.
 - Bookings: staff book only their department's rooms (`needsApproval`), DB exclusion constraint prevents overlaps;
   triggers fill creator/requester/department from the profile; non-admins can only cancel / withdraw.
 - Pages take `me` ({ userId, teacherId, sectionId }); when set, identity pickers are hidden and the department is fixed.
+- Access requests: a pending user calls `request_access` (fills `profiles.requested_*` only; options from
+  `access_options`); the admin approves in UsersAdmin (normal profile update; activation clears the request) or
+  declines (clears it, sets `request_declined_at`). Screen: pages/auth/AccessPending.jsx.
 - Changing SQL: add a new migration file (never edit applied ones once the owner has run them) and extend
   supabase/tests/rls.test.js.
 

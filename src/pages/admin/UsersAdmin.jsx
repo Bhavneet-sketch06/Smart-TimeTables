@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Loader2, RefreshCw, Search, ShieldAlert, UserPlus } from 'lucide-react'
+import { CheckCircle2, Inbox, Loader2, RefreshCw, Search, ShieldAlert, UserPlus } from 'lucide-react'
 import { Button, Card, EmptyState, Field, Select } from '../../components/ui.jsx'
 import { supabase } from '../../lib/supabase.js'
 import { friendlyDbError } from '../../hooks/useRemoteCollege.js'
@@ -20,15 +20,31 @@ const FILTERS = [
   { value: 'all', label: 'Everyone' },
 ]
 
-const draftOf = (p) => ({
-  display_name: p.display_name ?? '',
-  role: p.role,
-  dept_id: p.dept_id ?? '',
-  teacher_id: p.teacher_id ?? '',
-  section_id: p.section_id ?? '',
-  semester: p.semester ?? '',
-  active: p.active,
-})
+/** An open access request from a pending user (they chose it; nothing is granted until approved). */
+const hasRequest = (p) => p.role === 'pending' && !!p.requested_role
+
+// A pending user's request pre-fills the form, so approving is one click (after checking it).
+const draftOf = (p) =>
+  hasRequest(p)
+    ? {
+        display_name: p.display_name ?? '',
+        role: p.requested_role,
+        dept_id: p.requested_dept_id ?? '',
+        teacher_id: p.requested_teacher_id ?? '',
+        section_id: p.requested_section_id ?? '',
+        semester: p.requested_semester ?? '',
+        active: true,
+      }
+    : {
+        display_name: p.display_name ?? '',
+        role: p.role,
+        dept_id: p.dept_id ?? '',
+        teacher_id: p.teacher_id ?? '',
+        section_id: p.section_id ?? '',
+        semester: p.semester ?? '',
+        active: p.active,
+      }
+const savedDraftOf = (p) => draftOf({ ...p, requested_role: null })
 
 /** What a draft is missing before it can be saved (the database checks the same rules). */
 function missing(d) {
@@ -64,14 +80,38 @@ function UserCard({ data, profile, me, onSaved }) {
     setD((x) => ({ ...x, ...changes }))
   }
   const isMe = profile.user_id === me.userId
-  const changed = JSON.stringify(patchOf(d)) !== JSON.stringify(patchOf(draftOf(profile)))
+  const request = hasRequest(profile)
+  const changed = request || JSON.stringify(patchOf(d)) !== JSON.stringify(patchOf(savedDraftOf(profile)))
   const problem = d.role !== 'pending' && d.active ? missing(d) : ''
 
-  const teachers = useMemo(
-    () => [...(d.dept_id ? teachersOf(data, d.dept_id) : data.teachers)].sort((a, b) => a.name.localeCompare(b.name)),
-    [data, d.dept_id],
-  )
+  // The department's faculty, plus the one already chosen (a request may name someone from another department).
+  const teachers = useMemo(() => {
+    const list = d.dept_id ? teachersOf(data, d.dept_id) : data.teachers
+    const chosen = data.teachers.find((t) => t.id === d.teacher_id)
+    return [...list, ...(chosen && !list.includes(chosen) ? [chosen] : [])].sort((a, b) => a.name.localeCompare(b.name))
+  }, [data, d.dept_id, d.teacher_id])
   const sections = d.dept_id ? sectionsOf(data, d.dept_id) : []
+
+  const decline = async () => {
+    setBusy(true)
+    setError('')
+    const { error: e } = await supabase
+      .from('profiles')
+      .update({
+        requested_role: null,
+        requested_dept_id: null,
+        requested_teacher_id: null,
+        requested_section_id: null,
+        requested_semester: null,
+        requested_note: null,
+        requested_at: null,
+        request_declined_at: new Date().toISOString(),
+      })
+      .eq('user_id', profile.user_id)
+    setBusy(false)
+    if (e) return setError(friendlyDbError(e))
+    onSaved()
+  }
 
   const save = async () => {
     setBusy(true)
@@ -94,6 +134,12 @@ function UserCard({ data, profile, me, onSaved }) {
           <p className="truncate text-sm text-slate-500">
             {profile.email} · {profile.active ? ROLE_LABEL[profile.role] : profile.role === 'pending' ? 'Waiting for access' : `${ROLE_LABEL[profile.role]} (turned off)`}
           </p>
+          {request && (
+            <p className="mt-1 inline-flex flex-wrap items-center gap-x-2 rounded-lg bg-indigo-50 px-2 py-1 text-sm text-indigo-900">
+              <Inbox className="h-4 w-4" /> Asked for this access {new Date(profile.requested_at).toLocaleString()}
+              {profile.requested_note && <span className="text-indigo-700">· Note: {profile.requested_note}</span>}
+            </p>
+          )}
         </div>
         <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
           <input
@@ -154,10 +200,16 @@ function UserCard({ data, profile, me, onSaved }) {
         <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3">
           {changed && (
             <Button onClick={save} disabled={busy || !!problem}>
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />} Save access
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />} {request ? 'Approve' : 'Save access'}
             </Button>
           )}
-          {changed && <Button variant="ghost" onClick={() => setD(draftOf(profile))}>Undo</Button>}
+          {request && (
+            <Button variant="danger" onClick={decline} disabled={busy}>
+              Decline request
+            </Button>
+          )}
+          {changed && !request && <Button variant="ghost" onClick={() => setD(draftOf(profile))}>Undo</Button>}
+          {request && <span className="text-sm text-slate-500">Check that this is really them before approving.</span>}
           {problem && <span className="text-sm text-amber-700">{problem}</span>}
           {error && <span className="text-sm text-red-700">{error}</span>}
           {saved && !changed && (
@@ -196,6 +248,7 @@ export default function UsersAdmin({ data, me }) {
       filter === 'waiting' ? p.role === 'pending' : filter === 'active' ? p.active : filter === 'off' ? !p.active && p.role !== 'pending' : true,
     )
     .filter((p) => !query.trim() || `${p.email} ${p.display_name ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()))
+    .sort((a, b) => hasRequest(b) - hasRequest(a))
   const waiting = (profiles ?? []).filter((p) => p.role === 'pending').length
 
   return (
@@ -207,8 +260,9 @@ export default function UsersAdmin({ data, me }) {
       <Card className="flex items-start gap-3 border-indigo-200 bg-indigo-50/60">
         <UserPlus className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" />
         <p className="text-sm text-slate-700">
-          To add someone, invite them in the Supabase Dashboard (Authentication → Users → Invite user). They appear here as
-          "Waiting for access" and see nothing until you give them a role and turn access on. Public sign-up stays off.
+          To add someone, invite them in the Supabase Dashboard (Authentication → Users → Invite user). After signing in they
+          can say who they are; their request appears here filled in, and you approve or decline it. They see nothing until
+          you approve. You can also set the role yourself. Public sign-up stays off.
         </p>
       </Card>
       <div className="flex flex-wrap items-end gap-3">

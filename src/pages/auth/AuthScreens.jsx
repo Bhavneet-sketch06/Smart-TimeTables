@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, ArrowLeft, CalendarDays, KeyRound, Loader2, LogOut, Mail, RefreshCw, ShieldCheck, UserRoundX } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, CalendarDays, KeyRound, Loader2, LogOut, Mail, RefreshCw, ShieldCheck } from 'lucide-react'
 import { Button, Card, Field } from '../../components/ui.jsx'
 import { linkType } from '../../lib/supabase.js'
 
@@ -168,45 +168,6 @@ export function SetPassword({ auth, controls }) {
             </Button>
           </div>
         </form>
-      </Card>
-    </AuthFrame>
-  )
-}
-
-/** Signed in, but no active role yet (new invitation) or access turned off: no college data is loaded. */
-export function AccessPending({ auth, controls }) {
-  const [checking, setChecking] = useState(false)
-  const row = auth.profile.row
-  const turnedOff = row && row.role !== 'pending' && !row.active
-  const check = async () => {
-    setChecking(true)
-    await auth.reloadProfile()
-    setChecking(false)
-  }
-  return (
-    <AuthFrame controls={controls}>
-      <Card className="space-y-4 p-6">
-        <UserRoundX className="h-8 w-8 text-amber-600" />
-        <div>
-          <h1 className="text-2xl font-bold">Ask your administrator for access</h1>
-          <p className="mt-1 text-slate-600">
-            {turnedOff
-              ? 'Your access to Smart TimeTables has been turned off.'
-              : "You're signed in, but your account hasn't been given a role yet."}{' '}
-            An administrator assigns your role and department (and your faculty name or section) in the Users screen. Nothing
-            from the college is shown until then.
-          </p>
-        </div>
-        {auth.profile.status === 'error' && <Problem>Couldn't read your account: {auth.profile.error}</Problem>}
-        <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-600">Signed in as {auth.user?.email}</p>
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={check} disabled={checking}>
-            <RefreshCw className={`h-4 w-4 ${checking ? 'animate-spin' : ''}`} /> Check again
-          </Button>
-          <Button variant="secondary" onClick={auth.signOut}>
-            <LogOut className="h-4 w-4" /> Sign out
-          </Button>
-        </div>
       </Card>
     </AuthFrame>
   )

@@ -231,3 +231,49 @@ describe('administrator saves', () => {
     expect((await one(`select count(*)::int n from teacher_private`)).n).toBe(1)
   })
 })
+
+describe('access requests', () => {
+  it('shows pending users the names to choose from, and nobody else', async () => {
+    await as(U.admin, `select public.save_college($1)`, [{
+      teachers: [
+        { id: 't1', name: 'Dr One', deptId: 'cse', subjectIds: [], maxHours: 12, unavailable: [] },
+        { id: 't3', name: 'Dr Three', deptId: 'cse', subjectIds: [], maxHours: 9, unavailable: ['Tue-2'] },
+      ],
+    }])
+    const options = (await rows(U.pend, `select public.access_options() o`))[0].o
+    expect(options.departments.map((d) => d.id)).toEqual(['cse', 'ece'])
+    // Dr One already has an active faculty account; limits are never included.
+    expect(options.teachers).toEqual([{ id: 't3', name: 'Dr Three', deptId: 'cse' }])
+    expect(options.sections.map((s) => s.id)).toEqual(['s1', 's2'])
+    expect((await rows(U.stu, `select public.access_options() o`))[0].o).toBeNull()
+    await expect(as(null, `select public.access_options()`)).rejects.toThrow(/permission denied/)
+  })
+
+  it('records a request that grants nothing', async () => {
+    await expect(as(U.pend, `select public.request_access('admin', 'cse')`)).rejects.toThrow(/Choose HOD/)
+    await expect(as(U.pend, `select public.request_access('faculty', 'cse', 't1')`)).rejects.toThrow(/already has an account/)
+    await expect(as(U.pend, `select public.request_access('student', 'ece', null, 's1', '3rd')`)).rejects.toThrow(/Choose your section/)
+    await as(U.pend, `select public.request_access('faculty', 'cse', 't3', null, null, 'Employee 42')`)
+    const p = await one(`select * from profiles where user_id = $1`, [U.pend])
+    expect([p.role, p.active, p.requested_role, p.requested_teacher_id, p.requested_note]).toEqual(['pending', false, 'faculty', 't3', 'Employee 42'])
+    expect(await rows(U.pend, `select * from departments`)).toHaveLength(0)
+    expect(await rows(U.pend, `select * from timetable_entries`)).toHaveLength(0)
+  })
+
+  it('never lets users write requests or access directly', async () => {
+    expect((await as(U.pend, `update profiles set requested_role='hod' where user_id=$1`, [U.pend])).affectedRows).toBe(0)
+    await expect(as(U.stu, `select public.request_access('hod', 'cse')`)).rejects.toThrow(/managed by an administrator/)
+    await expect(as(U.pend, `update profiles set role='faculty' where user_id=$1`, [U.pend])).resolves.toMatchObject({ affectedRows: 0 })
+  })
+
+  it('lets an administrator decline, and approving settles the request', async () => {
+    await as(U.admin, `update profiles set requested_role=null, requested_dept_id=null, requested_teacher_id=null, requested_note=null, requested_at=null, request_declined_at=now() where user_id=$1`, [U.pend])
+    expect((await one(`select request_declined_at from profiles where user_id = $1`, [U.pend])).request_declined_at).not.toBeNull()
+    await as(U.pend, `select public.request_access('faculty', 'cse', 't3')`)
+    expect((await one(`select request_declined_at from profiles where user_id = $1`, [U.pend])).request_declined_at).toBeNull()
+    await assign(U.pend, { role: 'faculty', dept: 'cse', teacher: 't3' })
+    const p = await one(`select * from profiles where user_id = $1`, [U.pend])
+    expect([p.role, p.active, p.teacher_id, p.requested_role, p.requested_at]).toEqual(['faculty', true, 't3', null, null])
+    await expect(as(U.pend, `select public.request_access('hod', 'cse')`)).rejects.toThrow(/managed by an administrator/)
+  })
+})

@@ -14,6 +14,7 @@ Nothing here has been applied to your hosted project: review the SQL, then follo
 | `supabase/migrations/20261025120000_profiles_and_roles.sql` | `profiles` table (role + scope per Auth user), pending profile for every new user, `private` helper functions |
 | `supabase/migrations/20261025120100_college_data.sql` | College tables (settings, departments, room types, rooms, subjects, teachers, teacher limits, sections, timetable, bookings, requests), indexes, constraints, grants and RLS policies |
 | `supabase/migrations/20261025120200_guards_and_functions.sql` | Guard triggers, free/busy functions, `save_college` and `decide_request` |
+| `supabase/migrations/20261025130000_access_requests.sql` | Access requests: a pending user proposes role + scope (`request_access`, `access_options`); an administrator approves or declines |
 | `supabase/manual/first_admin.sql` | One-time first-administrator bootstrap (run by hand, not a migration) |
 | `supabase/tests/rls.test.js` | Runs the migrations in an in-process Postgres (PGlite) and checks every rule as each role (`npm test`) |
 
@@ -67,7 +68,8 @@ browser, no accounts). A production build without them shows "Sign-in isn't set 
 
 Read the three migration files first. Then either:
 
-- **SQL Editor**: Dashboard → SQL Editor → paste and run each file **in order** (`…120000`, `…120100`, `…120200`).
+- **SQL Editor**: Dashboard → SQL Editor → paste and run each file **in order** (`…120000`, `…120100`, `…120200`,
+  `…130000`). Supabase may warn that a query looks destructive (it contains `delete`/`revoke`); that is expected.
 - **Supabase CLI**: `supabase link --project-ref <your-project-ref>` then `supabase db push` (applies everything in
   `supabase/migrations` that the project hasn't run yet).
 
@@ -99,16 +101,23 @@ row in the Table Editor or SQL Editor (the guard only applies to requests made f
 
 ## 6. Invite and assign users
 
-1. Dashboard → Authentication → Users → **Invite user** (one email per person).
-2. They open the email link and choose a password. Until you assign them, they see "Ask your administrator for
-   access" and no college data.
-3. In the app: **Administrator → Users** → "Waiting for access". Choose the role and its scope:
+1. Dashboard → Authentication → Users → **Invite user** (one email per person). For test accounts you can instead use
+   **Add user → Create new user** with "Auto Confirm User" (no email is sent).
+2. They open the email link and choose a password (on the computer running the app while it is on localhost). They
+   then see "Ask your administrator for access" and no college data.
+3. **They say who they are**: on that screen they choose Student / Faculty / HOD, their department, and their section
+   (+ semester) or faculty name, add an optional note (roll number, employee ID) and **Send request**. This grants
+   nothing by itself. Faculty names already used by an active account are not offered; administrator access can't
+   be requested.
+4. In the app: **Administrator → Users** → "Waiting for access". A request appears with its choices already filled
+   in. Check that it's really that person (the note helps), then **Approve**, or **Decline request** (they are told
+   and can send a corrected one). You can also change the choices before approving, or set everything yourself
+   without a request. The fields are:
    - HOD / Coordinator: department
    - Faculty: department + faculty name (each faculty name can belong to one active account)
    - Student: department + section (+ semester, filled from the section)
-   Then **Save access** (access turns on with the role). The database checks that the department, faculty member
-   and section exist and match.
-4. To remove access, untick **Access on** and save (or set the role to "No access"). To delete someone completely,
+   The database checks that the department, faculty member and section exist and match.
+5. To remove access, untick **Access on** and save (or set the role to "No access"). To delete someone completely,
    delete the user in the Dashboard; their profile goes with it.
 
 Department, faculty and section choices come from the college data, so load or import the college before assigning
@@ -160,6 +169,8 @@ Nothing has been deployed. When you do:
 
 - One Supabase project holds one college.
 - Setup edits from two administrators at the same moment: the last save of each list wins.
+- A pending (invited, not yet approved) account can read the department, faculty and section **names** to fill in
+  its access request; nothing else.
 - Every active account can read the college catalogue (department, room, subject and section lists and teacher
   names; not teachers' limits or unavailability). Detailed schedules, bookings and requests are scoped as above.
 - A booking's check against regular classes runs in the app (with full free/busy data) right before saving; the
