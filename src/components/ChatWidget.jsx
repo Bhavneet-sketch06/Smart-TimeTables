@@ -92,9 +92,10 @@ export default function ChatWidget({ data, deptId = ALL }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-40 flex print:hidden items-center gap-2 rounded-full bg-indigo-600 px-5 py-3 font-semibold text-white shadow-lg shadow-indigo-600/30 transition hover:bg-indigo-700"
+        aria-label="Ask AI"
+        className="fixed bottom-4 right-4 z-40 flex print:hidden items-center gap-2 rounded-full bg-indigo-600 p-3.5 font-semibold text-white shadow-lg shadow-indigo-600/30 transition hover:bg-indigo-700 sm:bottom-5 sm:right-5 sm:px-5 sm:py-3"
       >
-        <MessageCircle className="h-5 w-5" /> Ask AI
+        <MessageCircle className="h-5 w-5" /> <span className="hidden sm:inline">Ask AI</span>
       </button>
     )
   }

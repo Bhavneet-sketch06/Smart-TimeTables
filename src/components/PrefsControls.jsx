@@ -16,7 +16,7 @@ function Segmented({ items, value, onChange, render }) {
           aria-label={it.label}
           aria-pressed={value === it.id}
           onClick={() => onChange(it.id)}
-          className={`grid h-8 min-w-8 place-items-center rounded-md px-1.5 ${
+          className={`grid h-7 min-w-7 place-items-center rounded-md px-1 sm:h-8 sm:min-w-8 sm:px-1.5 ${
             value === it.id ? 'bg-white shadow-sm' : 'opacity-60 hover:opacity-100'
           }`}
         >

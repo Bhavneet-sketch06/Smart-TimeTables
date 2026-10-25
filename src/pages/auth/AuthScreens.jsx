@@ -8,15 +8,15 @@ export function AuthFrame({ controls, children, wide = false }) {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="flex items-center justify-between gap-2 px-4 py-3 sm:px-6">
-        <a href="/" className="flex items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-600 text-white">
+        <a href="/" className="flex min-w-0 items-center gap-2">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-600 text-white">
             <CalendarDays className="h-5 w-5" />
           </span>
-          <span className="text-lg font-bold">Smart TimeTables</span>
+          <span className="truncate text-base font-bold sm:text-lg">Smart TimeTables</span>
         </a>
         {controls}
       </header>
-      <main className="flex flex-1 items-start justify-center px-4 pb-16 pt-6 sm:pt-12">
+      <main className="flex flex-1 items-start justify-center px-3 pb-16 pt-4 sm:px-4 sm:pt-12">
         <div className={`w-full ${wide ? 'max-w-2xl' : 'max-w-md'}`}>{children}</div>
       </main>
     </div>

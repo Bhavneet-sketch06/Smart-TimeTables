@@ -1,4 +1,5 @@
-import { Coffee, FlaskConical, MapPin, UserRound, UsersRound } from 'lucide-react'
+import { useState } from 'react'
+import { CalendarDays, Coffee, FlaskConical, LayoutList, MapPin, MoveHorizontal, UserRound, UsersRound } from 'lucide-react'
 import { DAY_NAMES, blockedOf, periodTimes, periodsOn, slotKey } from '../data/schema.js'
 
 // Full class names so Tailwind can see them at build time.
@@ -155,8 +156,29 @@ function Legend({ entries, lk, mode }) {
   )
 }
 
-/** Days across the top, time slots down the side (desktop and print); stacked day cards on phones. */
+const LAYOUT_KEY = 'ttgen:gridLayout'
+const readLayout = () => {
+  try {
+    return localStorage.getItem(LAYOUT_KEY) === 'day' ? 'day' : 'week'
+  } catch {
+    return 'week'
+  }
+}
+
+/**
+ * Days across the top, time slots down the side. On phones the same week grid scrolls sideways (the time column
+ * stays put), or the viewer can switch to stacked day cards; the choice is remembered per browser.
+ */
 export default function TimetableGrid({ data, entries, mode = 'section', showLegend = true }) {
+  const [layout, setLayout] = useState(readLayout)
+  const chooseLayout = (next) => {
+    setLayout(next)
+    try {
+      localStorage.setItem(LAYOUT_KEY, next)
+    } catch {
+      // remembering the layout is optional
+    }
+  }
   const lk = makeLookup(data)
   const { days, periodsPerDay: P } = data.time
   const { periods, breaks } = periodTimes(data.time)
@@ -187,7 +209,7 @@ export default function TimetableGrid({ data, entries, mode = 'section', showLeg
     for (const b of breaks.filter((x) => x.after === p)) {
       rows.push(
         <tr key={`break${p}`}>
-          <th className="px-2 py-1 text-left text-sm font-semibold text-amber-700">{b.label}</th>
+          <th className="sticky left-0 z-[1] shadow-[0_0_0_0.375rem_var(--color-white)] md:shadow-none bg-white px-2 py-1 text-left text-sm font-semibold text-amber-700 md:static md:bg-transparent">{b.label}</th>
           <td colSpan={days.length}>
             <div className="flex items-center justify-center gap-2 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 py-2 font-semibold tracking-wide text-amber-800">
               <Coffee className="h-4 w-4" /> {b.name}
@@ -238,8 +260,8 @@ export default function TimetableGrid({ data, entries, mode = 'section', showLeg
     })
     rows.push(
       <tr key={p} className="h-32 print:h-[4.6rem]">
-        <th className="whitespace-nowrap px-2 text-left align-top">
-          <div className="text-lg font-bold leading-tight text-slate-800">{periods[p].start}</div>
+        <th className="sticky left-0 z-[1] shadow-[0_0_0_0.375rem_var(--color-white)] md:shadow-none whitespace-nowrap bg-white px-2 text-left align-top md:static md:bg-transparent">
+          <div className="text-base font-bold leading-tight text-slate-800 sm:text-lg">{periods[p].start}</div>
           <div className="text-sm font-normal text-slate-400">to {periods[p].end}</div>
           <span className="mt-1 inline-block rounded-md bg-slate-100 px-1.5 text-xs font-semibold text-slate-500">
             P{p + 1}
@@ -254,11 +276,40 @@ export default function TimetableGrid({ data, entries, mode = 'section', showLeg
 
   return (
     <div>
-      <div className="hidden overflow-x-auto md:block print:block">
-        <table className="w-full table-fixed border-separate border-spacing-1.5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 md:hidden print:hidden">
+        <div role="tablist" aria-label="Timetable layout" className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+          {[
+            ['week', 'Week grid', CalendarDays],
+            ['day', 'Day by day', LayoutList],
+          ].map(([id, label, Icon]) => (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={layout === id}
+              onClick={() => chooseLayout(id)}
+              className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium ${
+                layout === id ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'
+              }`}
+            >
+              <Icon className="h-4 w-4" /> {label}
+            </button>
+          ))}
+        </div>
+        {layout === 'week' && (
+          <span className="inline-flex items-center gap-1 text-xs text-slate-500">
+            <MoveHorizontal className="h-3.5 w-3.5" /> Swipe sideways for every day
+          </span>
+        )}
+      </div>
+
+      <div
+        className={`${layout === 'week' ? 'block' : 'hidden'} -mx-1 overflow-x-auto overscroll-x-contain px-1 pb-1 md:block print:block`}
+        style={{ '--grid-min': `${6 + days.length * 11}rem` }}
+      >
+        <table className="w-full min-w-[var(--grid-min)] table-fixed border-separate border-spacing-1.5 md:min-w-0 print:min-w-0">
           <thead>
             <tr>
-              <th className="w-32" />
+              <th className="sticky left-0 z-[1] shadow-[0_0_0_0.375rem_var(--color-white)] md:shadow-none w-24 bg-white sm:w-32 md:static md:bg-transparent" />
               {days.map((day, d) => (
                 <th
                   key={day}
@@ -278,7 +329,7 @@ export default function TimetableGrid({ data, entries, mode = 'section', showLeg
         </table>
       </div>
 
-      <div className="space-y-4 md:hidden print:hidden">
+      <div className={`${layout === 'day' ? 'block' : 'hidden'} space-y-4 md:hidden print:hidden`}>
         {days.map((day, d) => (
           <div key={day} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <h3

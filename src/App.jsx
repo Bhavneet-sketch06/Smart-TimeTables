@@ -19,6 +19,7 @@ const ROLE_KEY = 'ttgen:role'
 const DEPT_KEY = 'ttgen:dept'
 const HOD_KEY = 'ttgen:hodDept'
 const ROLE_LABELS = { admin: 'Administrator', hod: 'HOD / Coordinator', faculty: 'Faculty', student: 'Student' }
+const ROLE_SHORT = { admin: 'Admin', hod: 'HOD', faculty: 'Faculty', student: 'Student' }
 const PAGES = { admin: AdminPage, hod: HodPage, faculty: FacultyPage, student: StudentPage }
 
 const readKey = (key, fallback) => {
@@ -56,11 +57,12 @@ export default function App() {
 function Brand({ onClick, children }) {
   const Tag = onClick ? 'button' : 'div'
   return (
-    <Tag onClick={onClick} className="flex items-center gap-2">
-      <span className="grid h-9 w-9 place-items-center rounded-xl bg-indigo-600 text-white">
+    <Tag onClick={onClick} className="flex min-w-0 items-center gap-2" aria-label="Smart TimeTables">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-600 text-white">
         <CalendarDays className="h-5 w-5" />
       </span>
-      <span className="text-lg font-bold">Smart TimeTables</span>
+      {/* On phones the icon stands for the name, leaving room for the role and the buttons. */}
+      <span className="hidden whitespace-nowrap text-lg font-bold sm:inline">Smart TimeTables</span>
       {children}
     </Tag>
   )
@@ -68,8 +70,9 @@ function Brand({ onClick, children }) {
 
 function RoleBadge({ role, data, deptId }) {
   return (
-    <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-sm font-medium text-indigo-700">
-      {ROLE_LABELS[role]}
+    <span className="truncate rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-700 sm:text-sm">
+      <span className="sm:hidden">{ROLE_SHORT[role]}</span>
+      <span className="hidden sm:inline">{ROLE_LABELS[role]}</span>
       {deptId && deptId !== ALL && (data.departments ?? []).length > 0 && ` · ${deptById(data, deptId)?.short ?? '?'}`}
     </span>
   )
@@ -104,14 +107,14 @@ function SaveStatus({ college }) {
   if (saving) {
     return (
       <span className="inline-flex items-center gap-1.5 text-sm text-slate-500">
-        <Loader2 className="h-4 w-4 animate-spin" /> Saving…
+        <Loader2 className="h-4 w-4 animate-spin" /> <span className="hidden sm:inline">Saving…</span>
       </span>
     )
   }
   if (error) {
     return (
       <span className="inline-flex items-center gap-1.5 text-sm text-red-700" title={error}>
-        <AlertTriangle className="h-4 w-4" /> Not saved
+        <AlertTriangle className="h-4 w-4" /> <span className="hidden sm:inline">Not saved</span>
         <Button variant="ghost" className="px-2 py-1" onClick={college.retrySave}>
           Retry
         </Button>
@@ -154,23 +157,23 @@ function Workspace({ auth, profile, controls }) {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur print:hidden">
-        <div className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="flex w-full items-center justify-between gap-2 px-3 py-2.5 sm:px-6 sm:py-3 lg:px-8">
           <Brand>
             <RoleBadge role={role} data={data} deptId={deptId} />
           </Brand>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {role === 'admin' && <SaveStatus college={college} />}
             {controls}
             <span className="hidden max-w-56 truncate text-sm text-slate-500 md:inline" title={profile.email}>
               {profile.display_name || profile.email}
             </span>
-            <Button variant="secondary" onClick={auth.signOut}>
-              <LogOut className="h-4 w-4" /> Sign out
+            <Button variant="secondary" onClick={auth.signOut} aria-label="Sign out" title="Sign out">
+              <LogOut className="h-4 w-4" /> <span className="hidden sm:inline">Sign out</span>
             </Button>
           </div>
         </div>
       </header>
-      <main className="w-full px-4 pb-28 pt-6 sm:px-6 lg:px-8 print:p-0">
+      <main className="w-full px-3 pb-28 pt-4 sm:px-6 sm:pt-6 lg:px-8 print:p-0">
         {college.status.error && (
           <p className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 print:hidden">
             <AlertTriangle className="h-4 w-4 shrink-0" /> {college.status.error}
@@ -245,22 +248,23 @@ function LocalDemoApp({ controls }) {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur print:hidden">
-        <div className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="flex w-full items-center justify-between gap-2 px-3 py-2.5 sm:px-6 sm:py-3 lg:px-8">
           <Brand onClick={() => setView('landing')}>
             <RoleBadge role={view} data={data} deptId={effective} />
-            <span className="hidden rounded-full bg-amber-100 px-2.5 py-0.5 text-sm font-medium text-amber-800 sm:inline">
+            <span className="hidden whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-0.5 text-sm font-medium text-amber-800 lg:inline">
               Browser-only demo
             </span>
           </Brand>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {controls}
-            <Button variant="secondary" onClick={() => setView('landing')}>
-              Switch role
+            <Button variant="secondary" className="whitespace-nowrap" onClick={() => setView('landing')}>
+              <span className="sm:hidden">Switch</span>
+              <span className="hidden sm:inline">Switch role</span>
             </Button>
           </div>
         </div>
       </header>
-      <main className="w-full px-4 pb-28 pt-6 sm:px-6 lg:px-8 print:p-0">
+      <main className="w-full px-3 pb-28 pt-4 sm:px-6 sm:pt-6 lg:px-8 print:p-0">
         {view === 'hod' && departments.length > 0 && !hodAssigned ? (
           <HodDepartmentPicker data={data} onPick={setHodDept} />
         ) : (

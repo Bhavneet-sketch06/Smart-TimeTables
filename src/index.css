@@ -57,6 +57,22 @@
 
 html {
   font-size: 18px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+/* Everything is sized in rem, so phones get a smaller base and the whole UI scales with it. */
+@media (max-width: 767px) {
+  html {
+    font-size: 16px;
+  }
+}
+@media (max-width: 374px) {
+  html {
+    font-size: 14.5px;
+  }
+}
+body {
+  overflow-x: hidden;
 }
 
 /* Printing: one timetable per A4 landscape page, colours kept, light theme (usePrefs drops .dark). */

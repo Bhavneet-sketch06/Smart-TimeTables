@@ -165,12 +165,12 @@ export default function Landing({ onSelect, lastRole, controls, accounts = false
   return (
     <div className="min-h-screen overflow-x-hidden bg-white">
       <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/75 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <a href="#top" className="group flex items-center gap-2.5">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-600/30 transition group-hover:rotate-6">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3 sm:gap-4 sm:px-6">
+          <a href="#top" className="group flex min-w-0 items-center gap-2 sm:gap-2.5">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-600/30 transition group-hover:rotate-6">
               <CalendarDays className="h-5 w-5" />
             </span>
-            <span className="text-lg font-bold tracking-tight">Smart TimeTables</span>
+            <span className="truncate text-base font-bold tracking-tight sm:text-lg">Smart TimeTables</span>
           </a>
           <nav className="hidden items-center gap-8 text-slate-600 md:flex">
             {[
@@ -184,12 +184,12 @@ export default function Landing({ onSelect, lastRole, controls, accounts = false
               </a>
             ))}
           </nav>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {controls}
             {accounts && (
               <button
                 onClick={() => onSelect()}
-                className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                className="whitespace-nowrap rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
               >
                 Sign in
               </button>

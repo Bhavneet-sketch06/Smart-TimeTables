@@ -172,7 +172,10 @@ blocks only its own group, so groups can be in different labs at the same time.
 - Styling with Tailwind utility classes only. No `dark:` variants needed: dark mode comes from `theme-dark.css`
   (regenerate it from `node_modules/tailwindcss/theme.css` if you use a new colour hue). Use fixed hex
   arbitrary values (e.g. `bg-[#4f46e5]`) only for things that must look the same in both themes.
-- Root font size is a fixed 18px (index.css); size things in rem-based utilities.
+- Root font size is 18px, 16px below 768px and 14.5px below 375px (index.css); size things in rem-based utilities so
+  phones scale down. Headers must fit one line at 320px (labels shorten / become icons below `sm`).
+- Timetable grid on phones: the same week table scrolls sideways (`--grid-min`, sticky time column) or switches to day
+  cards (`ttgen:gridLayout`); from `md` up it is the normal full-width table.
 - Printing: render timetables through `TimetableSheet` and mark everything else `print:hidden`; index.css sets
   A4 landscape and a smaller root font for print, and usePrefs switches to the light theme while printing.
 - Keep components small and functional; state flows from `useCollegeData` in `App.jsx` via props.
