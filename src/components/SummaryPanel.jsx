@@ -1,5 +1,6 @@
 import { collegeQuality, findClashes, scoreQuality } from '../scheduler.js'
 import { ALL, deptById, entriesOf, expectedClasses, fixedFor } from '../data/departments.js'
+import { RefreshCcw } from 'lucide-react'
 import { Card } from './ui.jsx'
 import FailureGuidance from './FailureGuidance.jsx'
 
@@ -37,6 +38,23 @@ function failedRuns(data, deptId) {
     }))
 }
 
+/** After a change: how much of the previous timetable stayed the same. */
+function ChangesNote({ changes }) {
+  return (
+    <Card className="flex items-start gap-2 border-emerald-200 bg-emerald-50 text-sm text-emerald-900">
+      <RefreshCcw className="mt-0.5 h-4 w-4 shrink-0" />
+      {changes.rebuilt ? (
+        <span>Updated after your change. The affected classes couldn't be fitted around the rest, so this was rebuilt from scratch.</span>
+      ) : (
+        <span>
+          Updated after your change: <b>{changes.moved}</b> {changes.moved === 1 ? 'class' : 'classes'} moved, <b>{changes.kept}</b> kept exactly
+          where {changes.kept === 1 ? 'it was' : 'they were'}.
+        </span>
+      )}
+    </Card>
+  )
+}
+
 /** Stats for the selected department (or the whole college). Clashes are always checked college-wide. */
 export default function SummaryPanel({ data, deptId = ALL }) {
   const tt = data.timetable
@@ -71,6 +89,7 @@ export default function SummaryPanel({ data, deptId = ALL }) {
           hint={run?.stats ? `${run.stats.steps} steps · ${run.stats.restarts} restarts` : 'with the whole college'}
         />
       </div>
+      {run?.changes && <ChangesNote changes={run.changes} />}
       {failedRuns(data, deptId).map((f) => (
         <FailureGuidance key={f.deptId} data={data} run={f.run} deptId={f.deptId} fixedEntries={f.fixedEntries} heading={f.heading} />
       ))}

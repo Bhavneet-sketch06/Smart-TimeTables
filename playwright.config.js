@@ -12,10 +12,11 @@ const watching = process.argv.includes('--headed')
 
 export default defineConfig({
   testDir: 'e2e',
-  timeout: 60_000,
+  // Generating the GNDEC college takes a few seconds of CPU; leave room when tests run side by side.
+  timeout: 120_000,
   expect: { timeout: 10_000 },
-  fullyParallel: !watching,
-  workers: watching ? 1 : undefined,
+  // One test at a time: several timetable generations at once can starve a laptop's CPU and time tests out.
+  workers: 1,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: `http://localhost:${PORT}`,

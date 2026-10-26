@@ -570,9 +570,10 @@ function softScore(state, ctx, u, c) {
 
 // ---------- search ----------
 
-function attempt(units, ctx, rng, maxSteps, deadline, failCount, fixedEntries) {
+function attempt(units, ctx, rng, maxSteps, deadline, failCount, fixedEntries, kept = []) {
   const state = makeState(ctx)
   prefill(state, ctx, fixedEntries)
+  for (const k of kept) mark(state, k.u, k.c, 1)
   const placed = new Array(units.length).fill(null)
   let count = 0
   let steps = 0
@@ -657,7 +658,7 @@ function describeUnit(u, ctx) {
 
 // Explain, in plain language, why the hardest unit could not be placed. Also returns `failure`: the same facts as
 // plain data (the unit, and what blocked each of its possible start times) for diagnose.js to build suggestions.
-function explainFailure(units, ctx, best, failCount, fixedEntries) {
+function explainFailure(units, ctx, best, failCount, fixedEntries, kept = []) {
   const unplaced = units.filter((u) => !best.placed[u.idx])
   if (!unplaced.length) return { reason: '', failure: null }
   const worst = unplaced.reduce((a, b) => (failCount[b.idx] > failCount[a.idx] ? b : a))
@@ -688,6 +689,7 @@ function explainFailure(units, ctx, best, failCount, fixedEntries) {
   // Replay the best partial timetable and see what blocks each possible start time.
   const state = makeState(ctx)
   prefill(state, ctx, fixedEntries)
+  for (const k of kept) mark(state, k.u, k.c, 1)
   units.forEach((u) => best.placed[u.idx] && mark(state, u, best.placed[u.idx], 1))
   const starts = new Map()
   for (const c of worst.candidates) {
@@ -724,8 +726,42 @@ function explainFailure(units, ctx, best, failCount, fixedEntries) {
   }
 }
 
+/**
+ * After a change (a teacher on leave, a room closed, a slot blocked), keep every previous class that still fits:
+ * its unit still exists with the same teacher, and its slot and room are still allowed and free. Only the rest are
+ * searched again. Returns { kept: [{ u, c }], rest } with `rest` re-indexed for the search.
+ */
+function planKeep(units, ctx, keep, fixedEntries) {
+  if (!keep.length) return { kept: [], rest: units }
+  const state = makeState(ctx)
+  prefill(state, ctx, fixedEntries)
+  const open = new Set(units)
+  const bySym = new Map()
+  for (const u of units) bySym.set(u.symKey, [...(bySym.get(u.symKey) ?? []), u])
+  const kept = []
+  for (const e of keep) {
+    const sym = `${e.sectionId}|${e.subjectId}|${e.kind}|${e.groupIndex ?? ''}`
+    const u = (bySym.get(sym) ?? []).find((x) => open.has(x) && x.length === e.length && x.teacherId === e.teacherId)
+    if (!u) continue
+    const c = u.candidates.find((x) => x.d === e.day && x.p === e.period && x.roomId === e.roomId)
+    if (!c || !fits(state, u, c)) continue
+    mark(state, u, c, 1)
+    open.delete(u)
+    kept.push({ u, c })
+  }
+  const rest = units.filter((u) => open.has(u))
+  rest.forEach((u, i) => (u.idx = i))
+  return { kept, rest }
+}
+
+/**
+ * Options: seed, maxSteps, maxRestarts, timeLimitMs, departmentId, fixedEntries (other departments' classes) and
+ * keep (this timetable's previous classes: those that still fit stay where they are, see planKeep). With `keep`,
+ * the result has `changes: { kept, moved }`; if the moved classes can't be placed around the kept ones, the
+ * department is rebuilt from scratch instead (`changes.rebuilt`).
+ */
 export function generateTimetable(data, options = {}) {
-  const { seed = Date.now(), maxSteps = 3000, maxRestarts = 25, timeLimitMs = 4000, departmentId, fixedEntries = [] } = options
+  const { seed = Date.now(), maxSteps = 3000, maxRestarts = 25, timeLimitMs = 4000, departmentId, fixedEntries = [], keep = [] } = options
   const started = Date.now()
   const check = precheck(data, { departmentId, fixedEntries })
   if (!check.ok) {
@@ -743,7 +779,8 @@ export function generateTimetable(data, options = {}) {
 
   const ctx = makeContext(data)
   const sections = departmentId ? data.sections.filter((s) => s.deptId === departmentId) : data.sections
-  const units = buildUnits(sections, ctx)
+  const allUnits = buildUnits(sections, ctx)
+  const { kept, rest: units } = planKeep(allUnits, ctx, keep, fixedEntries)
   const rng = mulberry32(seed)
   const failCount = new Array(units.length).fill(0)
   let best = { count: -1 }
@@ -753,7 +790,7 @@ export function generateTimetable(data, options = {}) {
 
   const deadline = started + timeLimitMs
   for (; restarts <= maxRestarts && Date.now() < deadline; restarts++) {
-    const run = attempt(units, ctx, rng, maxSteps, deadline, failCount, fixedEntries)
+    const run = attempt(units, ctx, rng, maxSteps, deadline, failCount, fixedEntries, kept)
     totalSteps += run.steps
     if (run.best.count > best.count) best = run.best
     if (run.solved) {
@@ -762,8 +799,23 @@ export function generateTimetable(data, options = {}) {
     }
   }
 
-  const entries = toEntries(units, best.placed)
-  const explained = solved ? { reason: '', failure: null } : explainFailure(units, ctx, best, failCount, fixedEntries)
+  if (kept.length && !solved) {
+    // The kept classes leave no room for the moved ones. First free the other classes of the sections and teachers
+    // involved (a small ripple), and only if that fails too, rebuild the whole department.
+    const sections = new Set(units.map((u) => u.sectionId))
+    const teachers = new Set(units.map((u) => u.teacherId))
+    const narrower = keep.filter((e) => !sections.has(e.sectionId) && !teachers.has(e.teacherId))
+    if (!options.widened && narrower.length < keep.length) {
+      const widened = generateTimetable(data, { ...options, keep: narrower, widened: true })
+      if (widened.ok) return widened
+    }
+    const rebuilt = generateTimetable(data, { ...options, keep: [] })
+    return { ...rebuilt, changes: { kept: 0, moved: allUnits.length, rebuilt: true } }
+  }
+  const entries = [...toEntries(kept.map((k) => k.u), kept.map((k) => k.c)), ...toEntries(units, best.placed)].sort(
+    (a, b) => a.day - b.day || a.period - b.period,
+  )
+  const explained = solved ? { reason: '', failure: null } : explainFailure(units, ctx, best, failCount, fixedEntries, kept)
   // Verified together with the fixed classes, so cross-department clashes would be caught too.
   const clashes = findClashes([...fixedEntries, ...entries], data)
   return {
@@ -777,9 +829,10 @@ export function generateTimetable(data, options = {}) {
       ...explained.failure,
       search: { steps: totalSteps, restarts: Math.min(restarts, maxRestarts), timeLimitMs, timedOut: Date.now() >= deadline },
     },
+    ...(keep.length ? { changes: { kept: kept.length, moved: units.length, rebuilt: false } } : {}),
     stats: {
-      placed: best.count,
-      total: units.length,
+      placed: best.count + kept.length,
+      total: allUnits.length,
       clashes: clashes.length,
       quality: scoreQuality(entries, data).score,
       steps: totalSteps,
@@ -798,6 +851,7 @@ export const runSummary = (r) => ({
   problems: r.problems,
   issues: r.issues ?? [],
   failure: r.failure ?? null,
+  ...(r.changes ? { changes: r.changes } : {}),
 })
 
 /**
@@ -822,10 +876,20 @@ export function generateCollege(data, options = {}) {
   const short = (id) => departments.find((d) => d.id === id)?.short ?? id
   const clashes = findClashes(entries, data)
   const sum = (key) => results.reduce((n, [, r]) => n + r.stats[key], 0)
+  const changed = results.filter(([, r]) => r.changes)
   return {
     ok: results.every(([, r]) => r.ok) && clashes.length === 0,
     entries,
     byDept,
+    ...(changed.length
+      ? {
+          changes: {
+            kept: changed.reduce((n, [, r]) => n + r.changes.kept, 0),
+            moved: changed.reduce((n, [, r]) => n + r.changes.moved, 0),
+            rebuilt: changed.some(([, r]) => r.changes.rebuilt),
+          },
+        }
+      : {}),
     unplaced: results.flatMap(([id, r]) => r.unplaced.map((u) => `${u} (${short(id)})`)),
     problems: results.flatMap(([id, r]) => r.problems.map((p) => `${short(id)}: ${p}`)),
     issues: [],

@@ -86,9 +86,15 @@ export function useCollegeData() {
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
-  // Editing any input invalidates a previously generated timetable.
+  // Editing any input invalidates a previously generated timetable. It is kept as `previous` so the next generation
+  // can leave every class the change doesn't affect where it was (see `keep` in generateTimetable).
   const update = (key, value) =>
-    setData((d) => ({ ...d, [key]: typeof value === 'function' ? value(d[key]) : value, timetable: null }))
+    setData((d) => ({
+      ...d,
+      [key]: typeof value === 'function' ? value(d[key]) : value,
+      timetable: null,
+      previous: d.timetable ?? d.previous ?? null,
+    }))
 
   // Bookings change without touching the timetable. Each change re-reads the latest saved bookings first and
   // writes straight back, so a booking made meanwhile in another tab or window is never overwritten.
@@ -169,7 +175,7 @@ export function useCollegeData() {
   return {
     data,
     update,
-    setTimetable: (timetable) => setData((d) => ({ ...d, timetable })),
+    setTimetable: (timetable) => setData((d) => ({ ...d, timetable, previous: null })),
     bookSpace,
     cancelBooking,
     addSampleBookings,

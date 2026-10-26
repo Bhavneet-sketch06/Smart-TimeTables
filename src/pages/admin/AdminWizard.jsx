@@ -3,7 +3,7 @@ import { Building2, CalendarCog, FileUp } from 'lucide-react'
 import { Button, Card } from '../../components/ui.jsx'
 import FailureGuidance from '../../components/FailureGuidance.jsx'
 import { generateCollege, generateTimetable, precheck } from '../../scheduler.js'
-import { ALL, deptById, fixedFor, mergeDepartmentTimetable, sectionsOf, subjectsOf, teachersOf } from '../../data/departments.js'
+import { ALL, deptById, entriesOf, fixedFor, mergeDepartmentTimetable, sectionsOf, subjectsOf, teachersOf } from '../../data/departments.js'
 import StepTime from './StepTime.jsx'
 import StepRooms from './StepRooms.jsx'
 import StepTeachers from './StepTeachers.jsx'
@@ -23,13 +23,18 @@ const STEPS = [
  * Generates one department around the classes every other department already has (shared rooms and teachers
  * stay clash-free). Returns { failures } when the inputs make it impossible, else { failures: [], timetable }.
  * A failure is { deptId, run, fixedEntries } for FailureGuidance.
+ *
+ * After an edit the timetable is cleared, but its last version (`data.previous`) still holds the other departments'
+ * classes (scheduled around) and this department's own (kept in place where they still fit, when `keepInPlace`).
  */
-export function generateDepartment(data, deptId) {
-  const fixed = fixedFor(data, deptId)
+export function generateDepartment(data, deptId, { keepInPlace = true } = {}) {
+  const base = { ...data, timetable: data.timetable ?? data.previous ?? null }
+  const fixed = fixedFor(base, deptId)
   const check = precheck(data, { departmentId: deptId, fixedEntries: fixed })
   if (!check.ok) return { failures: [{ deptId, run: { ok: false, ...check }, fixedEntries: fixed }] }
-  const result = generateTimetable(data, { departmentId: deptId, fixedEntries: fixed })
-  return { failures: [], timetable: mergeDepartmentTimetable(data, deptId, fixed, result) }
+  const keep = keepInPlace && !data.timetable && data.previous ? entriesOf(base, deptId) : []
+  const result = generateTimetable(data, { departmentId: deptId, fixedEntries: fixed, keep })
+  return { failures: [], timetable: mergeDepartmentTimetable(base, deptId, fixed, result) }
 }
 
 export default function AdminWizard({ college, deptId = ALL, onGenerated, initialFailures = [] }) {
@@ -40,6 +45,9 @@ export default function AdminWizard({ college, deptId = ALL, onGenerated, initia
   const [failures, setFailures] = useState(initialFailures)
   // Import College Data replaces the wizard until the administrator goes back to manual setup.
   const [importing, setImporting] = useState(false)
+  // After a change, regenerate around the classes it doesn't affect (they stay where they were).
+  const [keepInPlace, setKeepInPlace] = useState(true)
+  const canKeep = !data.timetable && !!data.previous?.entries?.length
   const { title, Component, shared } = STEPS[step]
   // With accounts these replace the college for everyone (bookings and requests included), so ask first.
   const sure = (what) => !college.shared || window.confirm(`${what} the shared college data for everyone, including all bookings and space requests?`)
@@ -59,14 +67,14 @@ export default function AdminWizard({ college, deptId = ALL, onGenerated, initia
   }
   const generateThis = () =>
     run('dept', () => {
-      const r = generateDepartment(data, deptId)
+      const r = generateDepartment(data, deptId, { keepInPlace })
       if (r.timetable) setTimetable(r.timetable)
       return r.failures
     })
   const generateAll = () =>
     run('all', () => {
       if (!data.sections.length) return [{ deptId: ALL, run: { ok: false, ...precheck(data) }, fixedEntries: [] }]
-      const result = generateCollege(data)
+      const result = generateCollege(data, { keep: keepInPlace && canKeep ? data.previous.entries : [] })
       setTimetable({ ...result, generatedAt: new Date().toISOString() })
       const byDept = Object.entries(result.byDept ?? {})
       // Only impossible inputs keep you on Setup; an incomplete search is explained on the Timetable tab.
@@ -181,6 +189,14 @@ export default function AdminWizard({ college, deptId = ALL, onGenerated, initia
           <Button onClick={() => setStep(step + 1)}>Next</Button>
         )}
       </div>
+      {last && canKeep && (
+        <label className="flex items-start justify-end gap-2 text-right text-sm text-slate-700">
+          <input type="checkbox" className="mt-0.5 h-4 w-4 accent-indigo-600" checked={keepInPlace} onChange={(e) => setKeepInPlace(e.target.checked)} />
+          <span>
+            <b>Keep unaffected classes in place.</b> Only the classes your change affects move; everyone else keeps their week.
+          </span>
+        </label>
+      )}
       {last && dept && (
         <p className="text-right text-sm text-slate-500">
           Generating {dept.short} keeps every other department's classes and works around their rooms and shared teachers.

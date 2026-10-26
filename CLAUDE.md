@@ -169,6 +169,10 @@ blocks only its own group, so groups can be in different labs at the same time.
    department in turn, largest first. Units prefer their department's rooms, then shared rooms, then others'.
    `precheck(..., { departmentId, fixedEntries })` counts shared teachers' hours in other departments.
    Quality across departments is `collegeQuality` (department scores weighted by classes).
+9. Sudden changes: `generateTimetable(data, { keep })` / `generateCollege(data, { keep })` keep every previous entry
+   that still fits (same unit and teacher, slot and room still allowed and free; `planKeep`) and search only the
+   rest; if that fails it frees the other classes of the affected sections/teachers, then rebuilds from scratch.
+   Results carry `changes: { kept, moved, rebuilt }` (shown by SummaryPanel). Tests: src/suddenChange.test.js.
 
 ## Conventions
 - `scheduler.js` must stay framework-free (no React imports) and deterministic for a given `seed` option.
@@ -185,7 +189,9 @@ blocks only its own group, so groups can be in different labs at the same time.
   A4 landscape and a smaller root font for print, and usePrefs switches to the light theme while printing.
 - Keep components small and functional; state flows from `useCollegeData` in `App.jsx` via props.
 - Other localStorage keys (`ttgen:role`, `ttgen:student`, `ttgen:studentView`, `ttgen:faculty`) are per-viewer conveniences only; wrap all storage access in try/catch.
-- Editing any input through `update()` clears the stored timetable (it would be stale).
+- Editing any input through `update()` clears the stored timetable (it would be stale) and keeps it in memory as
+  `data.previous` (never saved to Supabase); Generate then keeps unaffected classes in place (`keepInPlace` in
+  AdminWizard, `generateDepartment(data, deptId, { keepInPlace })`), and `setTimetable` clears `previous`.
 - Import College Data: one table per CSV file or per .xlsx sheet (time, departments, room_types, rooms, subjects,
   teachers, sections, assignments); records refer to each other by department code, room type name, subject code,
   section and teacher name. Modes: "add" never overwrites (clashes are errors; departments and room types are reused),

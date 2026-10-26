@@ -99,7 +99,9 @@ export function useRemoteCollege(profile) {
     if (!quiet) setStatus({ loading: true, error: '' })
     try {
       const next = await fetchCollege(role)
-      commit(next)
+      // `previous` lives only in this browser; keep it while the shared timetable is still cleared.
+      const previous = !next.timetable ? dataRef.current?.previous ?? null : null
+      commit(previous ? { ...next, previous } : next)
       setStatus({ loading: false, error: '' })
       return next
     } catch (error) {
@@ -170,7 +172,8 @@ export function useRemoteCollege(profile) {
   // Editing any input invalidates the shared timetable, exactly as in the browser-only version.
   const update = (key, value) => {
     const d = dataRef.current
-    commit({ ...d, [key]: typeof value === 'function' ? value(d[key]) : value, timetable: null })
+    // The cleared timetable stays in memory as `previous`: the next generation keeps unaffected classes in place.
+    commit({ ...d, [key]: typeof value === 'function' ? value(d[key]) : value, timetable: null, previous: d.timetable ?? d.previous ?? null })
     dirty.current.add(key)
     dirty.current.add('timetable')
     clearTimeout(timer.current)
@@ -178,7 +181,7 @@ export function useRemoteCollege(profile) {
   }
 
   const setTimetable = (timetable) => {
-    commit({ ...dataRef.current, timetable })
+    commit({ ...dataRef.current, timetable, previous: null })
     dirty.current.add('timetable')
     return flush()
   }

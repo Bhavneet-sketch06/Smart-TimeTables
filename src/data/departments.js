@@ -127,6 +127,7 @@ export function mergeDepartmentTimetable(data, deptId, fixedEntries, result) {
     problems: result.problems,
     issues: result.issues ?? [],
     failure: result.failure ?? null,
+    ...(result.changes ? { changes: result.changes } : {}),
     stats: {
       placed: sum('placed'),
       total: sum('total'),
