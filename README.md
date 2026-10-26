@@ -52,7 +52,7 @@ with a booking ID, and appear under **My bookings** (faculty) or **All bookings*
 cancelled. Loading the GNDEC or demo data adds three sample bookings for the next working day.
 
 ## AI change assistant (administrators)
-On the Timetable tab, **Something changed? Describe it**: type a sudden change in plain words ("Dr. Kapil Sharma is on
+In the administrator's **Reschedule** tab, type a sudden change in plain words ("Dr. Kapil Sharma is on
 leave this Wednesday", "Convocation on Friday in the first two periods", "Software Lab-I is closed for AC repair").
 Claude (`api/change.js`) turns it into exact changes, which the app checks against the college data and shows for
 approval; **Apply** regenerates around every class the change doesn't affect (those stay exactly where they were).

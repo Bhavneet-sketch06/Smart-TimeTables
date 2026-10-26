@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { CalendarDays, CalendarPlus, ClipboardList, Compass, LayoutGrid, Settings2, Ticket, UserRound, UsersRound } from 'lucide-react'
-import { Tabs } from '../components/ui.jsx'
+import { CalendarDays, CalendarPlus, ClipboardList, Compass, LayoutGrid, Settings2, Ticket, UserRound, UsersRound, Wand2 } from 'lucide-react'
+import { Button, EmptyState, Tabs } from '../components/ui.jsx'
 import AdminWizard, { generateDepartment } from './admin/AdminWizard.jsx'
 import UsersAdmin from './admin/UsersAdmin.jsx'
 import BrowserDataImport from './admin/BrowserDataImport.jsx'
@@ -85,6 +85,7 @@ export function AdminPage({ college, deptId, me }) {
         tabs={[
           { id: 'setup', label: 'Setup', Icon: Settings2 },
           { id: 'timetable', label: 'Timetable', Icon: LayoutGrid },
+          { id: 'reschedule', label: 'Reschedule', Icon: Wand2 },
           { ...GUIDE_TAB, badge: pendingRequests },
           BOOK_TAB,
           { id: 'bookings', label: bookingsLabel, Icon: Ticket, badge: upcoming },
@@ -96,7 +97,17 @@ export function AdminPage({ college, deptId, me }) {
       {tab === 'setup' && (
         <AdminWizard college={college} deptId={deptId} initialFailures={failures} onGenerated={() => (setFailures([]), setTab('timetable'))} />
       )}
-      {tab === 'timetable' && college.data.timetable && <ChangeAssistant college={college} />}
+      {tab === 'reschedule' &&
+        (college.data.timetable ? (
+          <ChangeAssistant college={college} onViewTimetable={() => setTab('timetable')} />
+        ) : (
+          <EmptyState>
+            Generate a timetable first; then describe any sudden change here.{' '}
+            <Button variant="ghost" onClick={() => setTab('setup')}>
+              Go to Setup
+            </Button>
+          </EmptyState>
+        ))}
       {tab === 'timetable' && (
         <TimetableViews
           data={college.data}

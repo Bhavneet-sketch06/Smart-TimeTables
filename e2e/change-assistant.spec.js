@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loadGndecAndGenerate, switchRole } from './helpers.js'
+import { loadGndecAndGenerate, switchRole, tab } from './helpers.js'
 
 // AI-1 to AI-3: the change assistant end to end. Claude's answers are mocked here (page.route), so the run is
 // repeatable and costs nothing; api/change.js itself is tested in tests/api-change.test.js.
@@ -30,6 +30,7 @@ test.describe('AI change assistant', () => {
   test('AI-1 Describe a change, check it, apply it: only the affected classes move', async ({ page }) => {
     const sent = await mockAssistant(page)
     await loadGndecAndGenerate(page)
+    await tab(page, 'Reschedule')
     await page.getByLabel('Describe the change').fill('Dr. Kapil Sharma is on leave this Wednesday')
     await page.getByRole('button', { name: 'Understand the change' }).click()
 
@@ -40,11 +41,12 @@ test.describe('AI change assistant', () => {
 
     const done = page.getByText(/Timetable updated: \d+ class(es)? moved, \d+ kept exactly where/)
     await expect(done).toBeVisible({ timeout: 60_000 })
-    await expect(page.getByText(/Updated after your change: \d+ class(es)? moved/)).toBeVisible()
     // Every moved class is listed with where it was and where it is now.
     const moved = Number((await done.innerText()).match(/(\d+) class/)[1])
     expect(moved).toBeGreaterThan(0)
     await expect(page.locator('ul.max-h-56 > li')).toHaveCount(moved)
+    await page.getByRole('button', { name: 'View the updated timetable' }).click()
+    await expect(page.getByText(/Updated after your change: \d+ class(es)? moved/)).toBeVisible()
     // The department's timetable shows the same change to everyone who looks at it.
     await expect(page.getByRole('region', { name: 'Timetable change' })).toContainText(`${moved} of your classes moved`)
   })
@@ -52,6 +54,7 @@ test.describe('AI change assistant', () => {
   test('AI-2 Draft and publish the announcement; the teacher sees it with their moved classes', async ({ page }) => {
     await mockAssistant(page)
     await loadGndecAndGenerate(page)
+    await tab(page, 'Reschedule')
     await page.getByLabel('Describe the change').fill('Dr. Kapil Sharma is on leave this Wednesday')
     await page.getByRole('button', { name: 'Understand the change' }).click()
     await page.getByRole('button', { name: 'Apply and update the timetable' }).click()
@@ -75,6 +78,7 @@ test.describe('AI change assistant', () => {
   test('AI-3 An unclear request gets a question back, and nothing changes', async ({ page }) => {
     await mockAssistant(page, { question: 'Which Sharma do you mean: Dr. Kapil Sharma or Pf. Diksha Sharma?' })
     await loadGndecAndGenerate(page)
+    await tab(page, 'Reschedule')
     await page.getByLabel('Describe the change').fill('Sharma is away tomorrow')
     await page.getByRole('button', { name: 'Understand the change' }).click()
     await expect(page.getByText('Which Sharma do you mean: Dr. Kapil Sharma or Pf. Diksha Sharma?')).toBeVisible()

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, CheckCircle2, HelpCircle, Loader2, Megaphone, MoveRight, RotateCcw, Sparkles, Wand2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, HelpCircle, LayoutGrid, Loader2, Megaphone, MoveRight, RotateCcw, Sparkles, Wand2 } from 'lucide-react'
 import { Button, Card } from '../../components/ui.jsx'
 import { authHeaders } from '../../lib/authHeaders.js'
 import { announcementFacts, buildCatalog, moveLines, resolveProposal, todayText, updateTimetable } from '../../changeAssistant.js'
@@ -27,7 +27,7 @@ async function askAssistant(body) {
  * against the college data and shows them for approval; Apply regenerates around every unaffected class, then
  * Claude drafts an announcement from the exact list of moved classes, which the administrator edits and publishes.
  */
-export default function ChangeAssistant({ college }) {
+export default function ChangeAssistant({ college, onViewTimetable }) {
   const { data } = college
   const [text, setText] = useState('')
   const [phase, setPhase] = useState('idle') // idle | thinking | review | applying | done
@@ -238,9 +238,16 @@ export default function ChangeAssistant({ college }) {
               {drafting ? 'Writing…' : 'Draft an announcement'}
             </Button>
           )}
-          <Button variant="ghost" onClick={() => (reset(), setText(''))}>
-            <RotateCcw className="h-4 w-4" /> Another change
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {onViewTimetable && (
+              <Button variant="secondary" onClick={onViewTimetable}>
+                <LayoutGrid className="h-4 w-4" /> View the updated timetable
+              </Button>
+            )}
+            <Button variant="ghost" onClick={() => (reset(), setText(''))}>
+              <RotateCcw className="h-4 w-4" /> Another change
+            </Button>
+          </div>
         </div>
       )}
 
