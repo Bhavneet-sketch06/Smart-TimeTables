@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { loadGndecAndGenerate, switchRole, tab } from './helpers.js'
 
-// AI-1 to AI-3: the change assistant end to end. Claude's answers are mocked here (page.route), so the run is
+// AI-1 to AI-3: the change assistant end to end, and the Notice tab other roles see. Claude's answers are mocked here (page.route), so the run is
 // repeatable and costs nothing; api/change.js itself is tested in tests/api-change.test.js.
 
 /** Answers /api/change like Claude would: a leave for the teacher named in the request, or a clarifying question. */
@@ -47,8 +47,6 @@ test.describe('AI change assistant', () => {
     await expect(page.locator('ul.max-h-56 > li')).toHaveCount(moved)
     await page.getByRole('button', { name: 'View the updated timetable' }).click()
     await expect(page.getByText(/Updated after your change: \d+ class(es)? moved/)).toBeVisible()
-    // The department's timetable shows the same change to everyone who looks at it.
-    await expect(page.getByRole('region', { name: 'Timetable change' })).toContainText(`${moved} of your classes moved`)
   })
 
   test('AI-2 Draft and publish the announcement; the teacher sees it with their moved classes', async ({ page }) => {
@@ -69,10 +67,14 @@ test.describe('AI change assistant', () => {
 
     await switchRole(page, 'Faculty')
     await page.getByLabel('Your name').selectOption({ label: 'Dr. Kapil Sharma (CSE)' })
-    const notice = page.getByRole('region', { name: 'Timetable change' })
-    await expect(notice).toContainText(/\d+ of your classes moved/)
-    await notice.getByRole('button', { name: /Read the announcement/ }).click()
-    await expect(notice).toContainText('Check "Moved" on your timetable.')
+    const noticeTab = page.getByRole('button', { name: /^Notice/ })
+    await expect(noticeTab).toContainText('1') // unread badge
+    await noticeTab.click()
+    await expect(page.getByRole('heading', { name: 'Timetable update' })).toBeVisible()
+    await expect(page.getByText('Check "Moved" on your timetable.')).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Your classes that moved \(\d+\)/ })).toBeVisible()
+    await page.getByRole('button', { name: /^My timetable/ }).click()
+    await expect(noticeTab).not.toContainText('1') // opened: no badge any more
   })
 
   test('AI-3 An unclear request gets a question back, and nothing changes', async ({ page }) => {

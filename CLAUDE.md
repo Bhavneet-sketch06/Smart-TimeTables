@@ -54,7 +54,8 @@ src/
   changeAssistant.js (+ .test)   # PURE: buildCatalog, resolveProposal (checks Claude's ids), applyChanges,
                                  # updateTimetable (keep-in-place regenerate), diffMoves/markMoved (movedFrom), moveLines,
                                  # announcementFacts; UI: pages/admin/ChangeAssistant.jsx (admin "Reschedule" tab),
-                                 # components/ChangeNotice.jsx (banner on student/faculty/department timetables)
+                                 # components/NoticeBoard.jsx ("Notice" tab for HOD/faculty/student; unread badge per
+                                 # browser in `ttgen:noticeSeen`)
   booking.js, booking.test.js    # PURE JS: Book a Space room checks, suggestions, demo bookings (seedBookings)
   scheduler.js                   # PURE JS: precheck, generateTimetable, findClashes, scoreQuality
   scheduler.test.js              # runs scheduler on demo data, asserts zero clashes

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { CalendarDays, CalendarPlus, ClipboardList, Compass, LayoutGrid, Settings2, Ticket, UserRound, UsersRound, Wand2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { BellRing, CalendarDays, CalendarPlus, ClipboardList, Compass, LayoutGrid, Settings2, Ticket, UserRound, UsersRound, Wand2 } from 'lucide-react'
 import { Button, EmptyState, Tabs } from '../components/ui.jsx'
 import AdminWizard, { generateDepartment } from './admin/AdminWizard.jsx'
 import UsersAdmin from './admin/UsersAdmin.jsx'
@@ -7,13 +7,14 @@ import BrowserDataImport from './admin/BrowserDataImport.jsx'
 import ChangeAssistant from './admin/ChangeAssistant.jsx'
 import TimetableViews from './TimetableViews.jsx'
 import FacultyView, { currentFacultyId } from './FacultyView.jsx'
-import StudentView from './StudentView.jsx'
+import StudentView, { readPick } from './StudentView.jsx'
+import NoticeBoard, { useNoticeSeen } from '../components/NoticeBoard.jsx'
 import CampusGuide from './campus/CampusGuide.jsx'
 import BookSpace from './booking/BookSpace.jsx'
 import BookingsList from './booking/BookingsList.jsx'
 import { upcomingBookings } from '../booking.js'
 import { needsApproval } from '../campusGuide.js'
-import { ALL, deptById } from '../data/departments.js'
+import { ALL, deptById, entriesOf, sectionsOf } from '../data/departments.js'
 
 // One page per role. `me` is the signed-in account's trusted identity ({ userId, teacherId?, sectionId? }) with
 // shared data, or null in the browser-only demo (where people pick who they are).
@@ -51,6 +52,15 @@ function BookingTabs({ tab, setTab, college, deptId, organizer, createdBy, mine,
     )
   }
   return null
+}
+
+/** The Notice tab for HODs, faculty and students: a badge until this browser has opened the current notice. */
+function useNoticeTab(data, tab) {
+  const [unseen, markSeen] = useNoticeSeen(data.meta?.notice)
+  useEffect(() => {
+    if (tab === 'notice') markSeen()
+  }, [tab, unseen])
+  return { id: 'notice', label: 'Notice', Icon: BellRing, badge: unseen ? 1 : 0 }
 }
 
 /** Bookings made for a department (falls back to its short name for bookings made before departments). */
@@ -138,6 +148,7 @@ export function HodPage({ college, deptId, me }) {
   const inDept = bookingInDept(college.data, deptId)
   const upcoming = upcomingBookings((college.data.bookings ?? []).filter(inDept)).length
   const short = deptById(college.data, deptId)?.short ?? ''
+  const noticeTab = useNoticeTab(college.data, tab)
   return (
     <div className="space-y-5">
       <Tabs
@@ -145,12 +156,14 @@ export function HodPage({ college, deptId, me }) {
         onChange={setTab}
         tabs={[
           { id: 'timetables', label: 'Timetables', Icon: ClipboardList },
+          noticeTab,
           GUIDE_TAB,
           BOOK_TAB,
           { id: 'bookings', label: `${short} bookings`, Icon: Ticket, badge: upcoming },
         ]}
       />
       {tab === 'timetables' && <TimetableViews data={college.data} deptId={deptId} />}
+      {tab === 'notice' && <NoticeBoard data={college.data} entries={entriesOf(college.data, deptId)} whose={`${short} classes`} />}
       {tab === 'guide' && <CampusGuide role="hod" college={college} deptId={deptId} />}
       {/* Coordinators see and cancel their department's bookings. */}
       <BookingTabs
@@ -178,6 +191,7 @@ export function FacultyPage({ college, deptId, me }) {
   const teacher = college.data.teachers.find((t) => t.id === teacherId)
   const isMine = (b) => b.organizerId === teacherId || b.createdBy?.teacherId === teacherId
   const upcoming = upcomingBookings((college.data.bookings ?? []).filter(isMine)).length
+  const noticeTab = useNoticeTab(college.data, tab)
   return (
     <div className="space-y-5">
       <Tabs
@@ -186,6 +200,7 @@ export function FacultyPage({ college, deptId, me }) {
         tabs={[
           { id: 'timetable', label: 'My timetable', Icon: UserRound },
           { id: 'department', label: 'Department timetable', Icon: LayoutGrid },
+          noticeTab,
           GUIDE_TAB,
           BOOK_TAB,
           { id: 'bookings', label: 'My bookings', Icon: Ticket, badge: upcoming },
@@ -193,6 +208,9 @@ export function FacultyPage({ college, deptId, me }) {
       />
       {tab === 'timetable' && <FacultyView data={college.data} deptId={deptId} teacherId={me?.teacherId} />}
       {tab === 'department' && <TimetableViews data={college.data} deptId={deptId} showSummary={false} />}
+      {tab === 'notice' && (
+        <NoticeBoard data={college.data} entries={(college.data.timetable?.entries ?? []).filter((e) => e.teacherId === teacherId)} />
+      )}
       {tab === 'guide' && <CampusGuide role="faculty" college={college} deptId={deptId} teacherId={me?.teacherId} />}
       <BookingTabs
         key={`${teacherId}:${deptId}`}
@@ -215,14 +233,24 @@ export function FacultyPage({ college, deptId, me }) {
 
 export function StudentPage({ college, deptId, me }) {
   const [tab, setTab] = useState('timetable')
+  const noticeTab = useNoticeTab(college.data, tab)
+  // Signed in: the account's section. Demo: the section picked on the My timetable tab.
+  const sectionId = me?.sectionId ?? readPick().section ?? sectionsOf(college.data, deptId)[0]?.id
   return (
     <div className="space-y-5">
       <Tabs
         value={tab}
         onChange={setTab}
-        tabs={[{ id: 'timetable', label: 'My timetable', Icon: CalendarDays }, GUIDE_TAB]}
+        tabs={[{ id: 'timetable', label: 'My timetable', Icon: CalendarDays }, noticeTab, GUIDE_TAB]}
       />
       {tab === 'timetable' && <StudentView data={college.data} deptId={deptId} sectionId={me?.sectionId} />}
+      {tab === 'notice' && (
+        <NoticeBoard
+          data={college.data}
+          entries={(college.data.timetable?.entries ?? []).filter((e) => e.sectionId === sectionId)}
+          whose="Your section's classes"
+        />
+      )}
       {tab === 'guide' && <CampusGuide role="student" college={college} deptId={deptId} sectionId={me?.sectionId} clientId={me?.userId} />}
     </div>
   )

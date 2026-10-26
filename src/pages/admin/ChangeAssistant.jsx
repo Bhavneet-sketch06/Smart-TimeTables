@@ -214,7 +214,7 @@ export default function ChangeAssistant({ college, onViewTimetable }) {
           )}
           {published ? (
             <p className="flex items-center gap-2 text-emerald-700">
-              <Megaphone className="h-4 w-4" /> Published: students and teachers see the notice and their moved classes on their timetable.
+              <Megaphone className="h-4 w-4" /> Published: students and teachers see the notice and their moved classes in their Notice tab.
             </p>
           ) : draft ? (
             <div className="space-y-2">

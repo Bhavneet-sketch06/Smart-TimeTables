@@ -57,7 +57,8 @@ leave this Wednesday", "Convocation on Friday in the first two periods", "Softwa
 Claude (`api/change.js`) turns it into exact changes, which the app checks against the college data and shows for
 approval; **Apply** regenerates around every class the change doesn't affect (those stay exactly where they were).
 Claude then drafts an announcement from the exact list of moved classes; after you edit and publish it, students
-and teachers see the notice and their moved classes (marked "Moved") on their timetables. The AI only proposes:
+and teachers see it in their **Notice** tab (with a badge until they open it), together with their moved classes,
+which are also marked "Moved" on their timetables. The AI only proposes:
 nothing changes until you click Apply, and only administrators can use it. Needs `ANTHROPIC_API_KEY` like Ask AI.
 
 ## AI timetable assistant

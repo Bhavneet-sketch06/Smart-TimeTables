@@ -4,7 +4,6 @@ import TimetableSheet from '../components/TimetableSheet.jsx'
 import DepartmentEmpty from '../components/DepartmentEmpty.jsx'
 import { ALL, batchOf, batchesOf, deptById, teachersOf } from '../data/departments.js'
 import { DataNote } from './TimetableViews.jsx'
-import ChangeNotice from '../components/ChangeNotice.jsx'
 
 const PICK_KEY = 'ttgen:faculty'
 
@@ -81,7 +80,6 @@ export default function FacultyView({ data, deptId = ALL, teacherId }) {
   return (
     <div className="space-y-4">
       <DataNote data={data} />
-      <ChangeNotice data={data} entries={allEntries} />
       <Card className={`grid gap-4 print:hidden ${own ? 'sm:grid-cols-2' : 'sm:grid-cols-[2fr_1fr]'}`}>
         {own ? (
           <div className="flex flex-col gap-1 text-sm">
