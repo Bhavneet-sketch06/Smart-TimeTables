@@ -1,4 +1,5 @@
 import { defineConfig, loadEnv } from 'vite'
+import { configDefaults } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -29,6 +30,8 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss(), apiDevServer()],
     test: {
       environment: 'node',
+      // e2e/ holds the Playwright browser tests (npm run test:e2e).
+      exclude: [...configDefaults.exclude, 'e2e/**'],
     },
   }
 })

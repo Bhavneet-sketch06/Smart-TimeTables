@@ -24,6 +24,9 @@ npm install        # install deps
 npm run dev        # dev server (http://localhost:5173)
 npm test           # vitest run (one-shot)
 npm run test:watch # vitest watch mode
+npm run test:ui    # vitest dashboard in the browser
+npm run test:e2e   # Playwright browser tests (e2e/, installed Chrome, browser-only demo on port 5199) + HTML report
+npm run test:demo  # the same, visible and slowed down (for showing); npm run test:report opens the last report
 npm run build      # production build to dist/
 npm run preview    # serve dist/ locally
 ```
@@ -55,6 +58,8 @@ src/
     tables.js                    # accepted tables/columns (+ synonyms), sample college used for templates and demo
     collegeImport.js             # readUpload, detectTable/autoMap, suggestMode, buildImport (add / update / replace)
   rules.test.js                  # room requirements and teaching rules end to end
+e2e/                             # Playwright tests named by test-case ID (G-02, C-06, M-02 ...); live.spec.js only reads the
+                                 # deployed site; never sign in with real accounts here
   data/
     schema.js                    # emptyCollege(), uid(), periodTimes(), data-shape docs
     demoCollege.js               # sample college (3 depts, 6 sections, 12 teachers, 8 rooms)

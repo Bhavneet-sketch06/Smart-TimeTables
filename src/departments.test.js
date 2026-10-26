@@ -5,6 +5,7 @@ import {
   batchesOf,
   departmentStatus,
   entriesOf,
+  expectedClasses,
   normalizeCollege,
   sectionsOf,
   teachersOf,
@@ -101,4 +102,17 @@ describe('scheduling several departments', () => {
     expect(civil.length).toBe(data.timetable.byDept.civil.stats.total)
     expect(entriesOf(data, 'all')).toHaveLength(data.timetable.entries.length)
   })
+})
+
+test('expected classes count what the scheduler places: double periods, tutorials and lab groups', () => {
+  const data = normalizeCollege(demoCollege())
+  const sub = data.subjects.find((s) => s.lectureHours >= 3)
+  sub.lectureHours = 4 // as two double periods (2 classes, not 4) ...
+  sub.lectureBlock = 2
+  sub.tutorialHours = 1 // ... plus one tutorial per lab group
+  const timetable = generateCollege(data, { seed: 1 })
+  expect(timetable.unplaced ?? []).toHaveLength(0)
+  for (const d of data.departments) {
+    expect(entriesOf({ ...data, timetable }, d.id).length).toBe(expectedClasses(data, d.id))
+  }
 })

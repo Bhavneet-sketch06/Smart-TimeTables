@@ -5,7 +5,7 @@
 // section.deptId / section.batch (e.g. '3rd Sem (D2)'), teacher.deptId (home department, null for service
 // departments such as Applied Sciences), subject.deptId (optional), room.deptId (optional home department).
 
-import { collegeQuality, findClashes, runSummary } from '../scheduler.js'
+import { collegeQuality, findClashes, lectureBlocksOf, runSummary } from '../scheduler.js'
 import { normalizeTime, roomTypesOf } from './schema.js'
 
 export const ALL = 'all'
@@ -140,7 +140,10 @@ export function mergeDepartmentTimetable(data, deptId, fixedEntries, result) {
   }
 }
 
-/** Number of classes a department's sections need per week (lectures + every lab session of every lab group). */
+/**
+ * Number of classes a department's sections need per week, counted as the scheduler places them: one per lecture
+ * block (a double period is one class), one per tutorial per lab group, and every lab session of every lab group.
+ */
 export function expectedClasses(data, deptId) {
   const subjects = new Map(data.subjects.map((s) => [s.id, s]))
   let n = 0
@@ -149,7 +152,7 @@ export function expectedClasses(data, deptId) {
     for (const a of sec.assignments) {
       const sub = subjects.get(a.subjectId)
       if (!sub) continue
-      n += (sub.lectureHours || 0) + (sub.labHours > 0 ? Math.max(1, sub.labSessions || 1) * groups : 0)
+      n += lectureBlocksOf(sub).length + (sub.tutorialHours || 0) * groups + (sub.labHours > 0 ? Math.max(1, sub.labSessions || 1) * groups : 0)
     }
   }
   return n
