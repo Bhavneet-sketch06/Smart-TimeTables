@@ -124,6 +124,7 @@ export function validateRequest(req, now = new Date()) {
 /** Does a room suit the event, and is it free for the whole held interval? */
 export function checkRoom(data, bookings, room, req, ignoreId) {
   const reasons = []
+  if (room.outOfService) reasons.push({ kind: 'closed', text: 'Out of service' })
   if (room.capacity < Number(req.attendance)) {
     reasons.push({ kind: 'capacity', text: `Only ${room.capacity} seats (needs ${req.attendance})` })
   }

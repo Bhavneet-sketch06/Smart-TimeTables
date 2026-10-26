@@ -3,14 +3,11 @@
 // (see vite.config.js). The API key is read from the ANTHROPIC_API_KEY environment variable and never
 // reaches the browser.
 import Anthropic from '@anthropic-ai/sdk'
+import { checkAccount, fail, friendlyError, readJson } from './_lib/http.js'
 
 export const config = { maxDuration: 60 }
 
 const MODEL = 'claude-opus-5-5'
-// With accounts (Supabase configured), only signed-in users with active access may use the assistant. These are the
-// public project URL and publishable key; the user's own token decides what the database returns.
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-const SUPABASE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY
 const MAX_TURNS = 20
 const MAX_MESSAGE_CHARS = 2000
 const MAX_CONTEXT_CHARS = 200_000
@@ -31,19 +28,6 @@ Guidelines:
   "events only" never hold regular classes. To reserve a room, users open the "Book a space" tab (Faculty, HOD or Admin).
 - Use plain text with simple "-" bullets; no tables or headings.`
 
-async function readJson(req) {
-  if (req.body !== undefined) return typeof req.body === 'string' ? JSON.parse(req.body) : req.body
-  const chunks = []
-  for await (const chunk of req) chunks.push(chunk)
-  return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')
-}
-
-function fail(res, status, message) {
-  res.statusCode = status
-  res.setHeader('Content-Type', 'text/plain; charset=utf-8')
-  res.end(message)
-}
-
 /** Returns an error message, or null if the conversation is acceptable. */
 function validate(messages, context) {
   if (!Array.isArray(messages) || messages.length === 0) return 'No messages were sent.'
@@ -56,34 +40,6 @@ function validate(messages, context) {
   if (messages.at(-1).role !== 'user') return 'The last message must be a question.'
   if (typeof context !== 'string' || context.length > MAX_CONTEXT_CHARS) return 'The timetable data is missing or too large.'
   return null
-}
-
-/** Returns an error message, or null if the caller may use the assistant. */
-async function checkAccount(req) {
-  if (!SUPABASE_URL || !SUPABASE_KEY) return null // browser-only demo: no accounts exist
-  const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '')
-  if (!token) return 'Sign in to use the assistant.'
-  let sub = ''
-  try {
-    sub = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8')).sub ?? ''
-  } catch {
-    return 'Your session is not valid. Sign in again.'
-  }
-  // The database verifies the token; RLS returns only the caller's own profile row (or all, for administrators).
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=role,active&user_id=eq.${encodeURIComponent(sub)}`, {
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}` },
-  }).catch(() => null)
-  if (!res) return 'Could not check your account. Try again.'
-  if (!res.ok) return 'Your session has expired. Sign in again.'
-  const rows = await res.json().catch(() => [])
-  return rows.some((r) => r.active && r.role !== 'pending') ? null : 'Your account has no access yet. Ask your administrator.'
-}
-
-function friendlyError(err) {
-  if (err instanceof Anthropic.AuthenticationError) return 'The API key was rejected. Check ANTHROPIC_API_KEY.'
-  if (err instanceof Anthropic.RateLimitError) return 'The assistant is busy right now. Please try again in a moment.'
-  if (err instanceof Anthropic.APIError) return `The AI service returned an error (${err.status ?? 'unknown'}).`
-  return 'Could not reach the AI service.'
 }
 
 export default async function handler(req, res) {

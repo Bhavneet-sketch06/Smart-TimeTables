@@ -36,6 +36,11 @@ deployed as serverless functions automatically. Set `ANTHROPIC_API_KEY` in Proje
 ## Folder structure
 ```
 api/chat.js                      # assistant endpoint: checks the Supabase session (when configured), streams Claude's answer
+api/change.js                    # change assistant (admins): "understand" -> structured changes (json_schema output,
+                                 # catalogue cached), "announce" -> notice text from exact facts; createHandler(makeClient)
+api/_lib/http.js                 # shared by api/: readJson, fail, checkAccount({ adminOnly }), friendlyError
+                                 # (never put tests or helpers directly in api/: every file there is deployed as an endpoint)
+tests/api-change.test.js         # api/change.js with a stand-in client (no network, no credits)
 supabase/migrations/             # profiles/roles, college tables + RLS, guard triggers, free/busy + save_college/decide_request
 supabase/manual/first_admin.sql  # one-time first-administrator bootstrap (run by hand)
 supabase/tests/rls.test.js       # migrations + policies checked per role in PGlite
@@ -46,6 +51,9 @@ src/
   auth/useAuth.js                # session, own profile (read only), sign in/out, reset, set password
   remote/collegeRows.js (+test)  # PURE: rows <-> college object, data.busy (free/busy), save payloads, verifyCopy
   chat/timetableContext.js       # data + timetable + bookings -> compact text for the assistant (cached)
+  changeAssistant.js (+ .test)   # PURE: buildCatalog, resolveProposal (checks Claude's ids), applyChanges,
+                                 # updateTimetable (keep-in-place regenerate), diffMoves/markMoved (movedFrom), moveLines,
+                                 # announcementFacts; UI: pages/admin/ChangeAssistant.jsx, components/ChangeNotice.jsx
   booking.js, booking.test.js    # PURE JS: Book a Space room checks, suggestions, demo bookings (seedBookings)
   scheduler.js                   # PURE JS: precheck, generateTimetable, findClashes, scoreQuality
   scheduler.test.js              # runs scheduler on demo data, asserts zero clashes
@@ -115,7 +123,10 @@ e2e/                             # Playwright tests named by test-case ID (G-02,
                requester: { role, name, clientId?, teacherId?, sectionId?, deptId? }, decidedAt?, decisionNote?, bookingId? }],
 }
 ```
-Rooms may have `facilities: string[]` and `eventsOnly: true` (never used for classes, only bookings).
+Rooms may have `facilities: string[]`, `eventsOnly: true` (never used for classes, only bookings) and
+`outOfService: true` (no classes and no bookings until cleared). After a change, timetable entries that moved carry
+`movedFrom: { day, period, roomId }` (cleared by the next regeneration); `meta.notice = { text, at, moved }` is the
+published change notice (saved with `publishNotice`, which does not clear the timetable).
 Older saved data (single `breakAfter` / `breakMinutes`, no `roomTypes`) is upgraded by `normalizeCollege` via
 `normalizeTime` / `roomTypesOf`; time helpers live in `data/schema.js` (`breaksOf`, `periodsOn`, `isClosed`,
 `segmentsOf`, `blocksPerWeek`, `openPeriodsOf`, `withDefaults`). Never read `time.breakAfter` directly.

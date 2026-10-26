@@ -283,6 +283,13 @@ export function useRemoteCollege(profile) {
     await saveParts({ addBookings: seedBookings(dataRef.current) }).catch(() => {})
     await load({ quiet: true })
   }
+  /** The change notice shown on every timetable (null removes it); saved without touching the timetable. */
+  const publishNotice = async (notice) => {
+    const meta = { ...(dataRef.current.meta ?? {}), notice: notice ?? undefined }
+    commit({ ...dataRef.current, meta })
+    await saveParts({ meta }).catch(() => {})
+  }
+
   const addSampleRequests = async () => {
     const d = dataRef.current
     await saveParts({ addRequests: seedRequests(d, d.bookings ?? [], nextWorkingDay(d), 'demo') }).catch(() => {})
@@ -311,6 +318,7 @@ export function useRemoteCollege(profile) {
     decideRequest,
     addSampleRequests,
     importCollege,
+    publishNotice: isAdmin ? publishNotice : noop,
     loadDemo: () => replaceAll(withDemoItems(demoCollege())),
     loadGndec: () => replaceAll(withDemoItems(gndecCollege())),
     reset: () => replaceAll(emptyCollege()),

@@ -97,6 +97,15 @@ export default function StepRooms({ data, update }) {
             />
             Events only (no classes)
           </label>
+          <label className="col-span-2 flex items-center gap-2 pb-2 text-sm text-slate-600 sm:col-span-1">
+            <input
+              type="checkbox"
+              checked={!!r.outOfService}
+              onChange={(e) => patch(r.id, { outOfService: e.target.checked || undefined })}
+              className="h-4 w-4 accent-red-600"
+            />
+            Out of service (no classes or bookings)
+          </label>
         </div>
       ))}
       <Button variant="secondary" onClick={add}>

@@ -2,14 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { MessageCircle, RotateCcw, SendHorizontal, Sparkles, X } from 'lucide-react'
 import { buildTimetableContext } from '../chat/timetableContext.js'
 import { ALL, deptById, sectionsOf, teachersOf } from '../data/departments.js'
-import { supabase } from '../lib/supabase.js'
-
-/** With accounts, the assistant endpoint only answers signed-in users with access: send the session token. */
-async function authHeaders() {
-  if (!supabase) return {}
-  const { data } = await supabase.auth.getSession()
-  return data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {}
-}
+import { authHeaders } from '../lib/authHeaders.js'
 
 function suggestionsFor(data, deptId) {
   const sec = sectionsOf(data, deptId)[0]?.name

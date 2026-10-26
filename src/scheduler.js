@@ -73,7 +73,8 @@ export function roomMatcher(data) {
   const kinds = new Map(roomTypesOf(data).map((t) => [t.id, t.kind]))
   const has = (room, f) => (room.facilities ?? []).some((x) => x.trim().toLowerCase() === f.trim().toLowerCase())
   return (room, kind, students, need = {}) => {
-    if (room.eventsOnly || room.capacity < students) return false
+    // Events-only halls never hold classes; a room out of service (maintenance, repairs) holds nothing until it is back.
+    if (room.eventsOnly || room.outOfService || room.capacity < students) return false
     if (need.type) {
       if (room.type !== need.type) return false
     } else if ((kinds.get(room.type) ?? 'lecture') !== (kind === 'lab' ? 'lab' : 'lecture')) return false

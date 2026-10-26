@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarDays, Coffee, FlaskConical, LayoutList, MapPin, MoveHorizontal, UserRound, UsersRound } from 'lucide-react'
+import { CalendarDays, Coffee, FlaskConical, LayoutList, MapPin, MoveHorizontal, MoveRight, UserRound, UsersRound } from 'lucide-react'
 import { DAY_NAMES, blockedOf, periodTimes, periodsOn, slotKey } from '../data/schema.js'
 
 // Full class names so Tailwind can see them at build time.
@@ -33,6 +33,8 @@ export function makeLookup(data) {
     teachers: map(data.teachers),
     rooms: map(data.rooms),
     sections: map(data.sections),
+    days: data.time.days,
+    starts: periodTimes(data.time).periods.map((p) => p.start),
     color: (subjectId) => subjectColor.get(subjectId) || NEUTRAL,
   }
 }
@@ -79,6 +81,14 @@ function ClassCard({ e, mode, lk, compact = false }) {
         )}
       </div>
       {!compact && sub?.code && <span className="text-xs font-semibold tracking-wide opacity-60">{sub.code}</span>}
+      {e.movedFrom && (
+        <span
+          title={`Moved here after a change; it was ${lk.days[e.movedFrom.day] ?? ''} ${lk.starts[e.movedFrom.period] ?? ''} in ${lk.rooms.get(e.movedFrom.roomId)?.name ?? '?'}`}
+          className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-[#fef3c7] px-1.5 text-xs font-bold text-[#92400e]"
+        >
+          <MoveRight className="h-3 w-3" /> Moved
+        </span>
+      )}
       <div className={`mt-auto space-y-0.5 ${compact ? 'pt-1 text-xs' : 'pt-2 text-sm'}`}>
         {lines.map(({ Icon, text }, i) => (
           <div key={i} className="flex items-center gap-1.5 opacity-85">

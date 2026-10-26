@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { roomTypeName } from '../data/schema.js'
-import { ALL, batchOf, deptById, sectionsOf, teachersOf } from '../data/departments.js'
+import { ALL, batchOf, deptById, entriesOf, sectionsOf, teachersOf } from '../data/departments.js'
 import { Card, EmptyState, Select } from '../components/ui.jsx'
 import TimetableSheet from '../components/TimetableSheet.jsx'
 import SummaryPanel from '../components/SummaryPanel.jsx'
+import ChangeNotice from '../components/ChangeNotice.jsx'
 import DepartmentEmpty, { departmentNeedsAttention } from '../components/DepartmentEmpty.jsx'
 
 const TABS = [
@@ -75,6 +76,7 @@ export default function TimetableViews({ data, deptId = ALL, canManage = false, 
   return (
     <div className="space-y-4">
       <DataNote data={data} />
+      <ChangeNotice data={data} entries={entriesOf(data, deptId)} />
       {showSummary && (
         <div className="print:hidden">
           <SummaryPanel data={data} deptId={deptId} />

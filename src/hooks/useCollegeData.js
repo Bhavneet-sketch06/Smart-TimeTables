@@ -184,6 +184,8 @@ export function useCollegeData() {
     decideRequest,
     addSampleRequests,
     /** Saves imported setup data (already validated by buildImport); saved bookings and requests are kept as they are. */
+    /** The change notice shown on every timetable (null removes it); saved without touching the timetable. */
+    publishNotice: (notice) => setData((d) => ({ ...d, meta: { ...(d.meta ?? {}), notice: notice ?? undefined } })),
     importCollege: (next) => replaceAll({ ...next, timetable: null, bookings: latestBookings(), requests: latestRequests() }),
     loadDemo: () => replaceAll(withDemoBookings(demoCollege())),
     loadGndec: () => replaceAll(withDemoBookings(gndecCollege())),

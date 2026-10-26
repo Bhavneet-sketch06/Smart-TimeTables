@@ -7,6 +7,7 @@ import { ALL, batchOf, batchesOf, deptById, sectionsOf } from '../data/departmen
 import { DataNote } from './TimetableViews.jsx'
 import { groupNamesOf, labGroupsOf } from '../scheduler.js'
 import MyDay from './MyDay.jsx'
+import ChangeNotice from '../components/ChangeNotice.jsx'
 
 const PICK_KEY = 'ttgen:student'
 const VIEW_KEY = 'ttgen:studentView'
@@ -97,6 +98,7 @@ export default function StudentView({ data, deptId = ALL, sectionId }) {
   return (
     <div className="space-y-4">
       <DataNote data={data} />
+      <ChangeNotice data={data} entries={entries} />
       {own ? (
         <Card className="flex flex-wrap items-end justify-between gap-3 print:hidden">
           <div>

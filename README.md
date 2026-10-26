@@ -51,6 +51,15 @@ If nothing fits, the app says why and suggests nearby free times. Confirmed book
 with a booking ID, and appear under **My bookings** (faculty) or **All bookings** (HOD/admin), where they can be
 cancelled. Loading the GNDEC or demo data adds three sample bookings for the next working day.
 
+## AI change assistant (administrators)
+On the Timetable tab, **Something changed? Describe it**: type a sudden change in plain words ("Dr. Kapil Sharma is on
+leave this Wednesday", "Convocation on Friday in the first two periods", "Software Lab-I is closed for AC repair").
+Claude (`api/change.js`) turns it into exact changes, which the app checks against the college data and shows for
+approval; **Apply** regenerates around every class the change doesn't affect (those stay exactly where they were).
+Claude then drafts an announcement from the exact list of moved classes; after you edit and publish it, students
+and teachers see the notice and their moved classes (marked "Moved") on their timetables. The AI only proposes:
+nothing changes until you click Apply, and only administrators can use it. Needs `ANTHROPIC_API_KEY` like Ask AI.
+
 ## AI timetable assistant
 The **Ask AI** button (bottom-right of every app screen) answers questions about the current timetable, e.g.
 "When is D3 CS A free on Wednesday?". It calls `api/chat.js`, which uses Claude (`claude-opus-5-5`) on the server so

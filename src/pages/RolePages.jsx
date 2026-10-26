@@ -4,6 +4,7 @@ import { Tabs } from '../components/ui.jsx'
 import AdminWizard, { generateDepartment } from './admin/AdminWizard.jsx'
 import UsersAdmin from './admin/UsersAdmin.jsx'
 import BrowserDataImport from './admin/BrowserDataImport.jsx'
+import ChangeAssistant from './admin/ChangeAssistant.jsx'
 import TimetableViews from './TimetableViews.jsx'
 import FacultyView, { currentFacultyId } from './FacultyView.jsx'
 import StudentView from './StudentView.jsx'
@@ -95,6 +96,7 @@ export function AdminPage({ college, deptId, me }) {
       {tab === 'setup' && (
         <AdminWizard college={college} deptId={deptId} initialFailures={failures} onGenerated={() => (setFailures([]), setTab('timetable'))} />
       )}
+      {tab === 'timetable' && college.data.timetable && <ChangeAssistant college={college} />}
       {tab === 'timetable' && (
         <TimetableViews
           data={college.data}
