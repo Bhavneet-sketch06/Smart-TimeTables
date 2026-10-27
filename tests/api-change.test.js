@@ -2,6 +2,7 @@
 // No network and no API credits are used.
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createHandler, requestFor } from '../api/change.js'
+import { demoRateLimit } from '../api/_lib/http.js'
 
 const proposal = {
   kind: 'changes',
@@ -39,7 +40,7 @@ const understand = { mode: 'understand', text: 'Dr. Kapil Sharma is on leave thi
 const saved = {}
 
 beforeEach(() => {
-  for (const k of ['ANTHROPIC_API_KEY', 'VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLISHABLE_KEY', 'SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY']) {
+  for (const k of ['ANTHROPIC_API_KEY', 'VITE_SUPABASE_URL', 'VITE_SUPABASE_PUBLISHABLE_KEY', 'SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY', 'VITE_LOCAL_DEMO']) {
     saved[k] = process.env[k]
     delete process.env[k]
   }
@@ -113,6 +114,27 @@ describe('api/change', () => {
     expect((await call(handler, understand, { token: token('old1') })).statusCode).toBe(401)
     expect(fake.calls).toHaveLength(0)
     expect((await call(handler, understand, { token: token('admin1') })).statusCode).toBe(200)
+  })
+
+  test('in the evaluator demo (VITE_LOCAL_DEMO=true) no sign-in is needed, even with Supabase configured', async () => {
+    process.env.VITE_SUPABASE_URL = 'https://example.supabase.test'
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY = 'publishable'
+    process.env.VITE_LOCAL_DEMO = 'true'
+    vi.stubGlobal('fetch', async () => {
+      throw new Error('the demo never asks the database about accounts')
+    })
+    const fake = fakeClient(textReply(JSON.stringify(proposal)))
+    const res = await call(createHandler(fake.make), understand)
+    expect(res.statusCode).toBe(200)
+  })
+
+  test('without accounts, each visitor gets a limited number of AI requests', () => {
+    const req = { headers: { 'x-forwarded-for': '203.0.113.7, 10.0.0.1' } }
+    const t0 = 1_000_000
+    for (let i = 0; i < 30; i++) expect(demoRateLimit(req, t0 + i)).toBeNull()
+    expect(demoRateLimit(req, t0 + 31)).toMatchObject({ status: 429 })
+    expect(demoRateLimit({ headers: { 'x-forwarded-for': '198.51.100.2' } }, t0 + 31)).toBeNull() // someone else
+    expect(demoRateLimit(req, t0 + 11 * 60_000)).toBeNull() // ten minutes later
   })
 
   test('the request schema allows only the six supported kinds of change', () => {

@@ -17,6 +17,9 @@ picker). Static site on Vercel. Setup: docs/SUPABASE_SETUP.md.
 - Supabase (`@supabase/supabase-js`, publishable key only; never a secret/service key in `src/` or any `VITE_` var).
   `supabase/migrations/*.sql` are applied manually by the owner; `supabase/tests/rls.test.js` runs them in PGlite.
 - No router: `App.jsx` picks AccountsApp (sign-in → role from profile) or LocalDemoApp (`view` state, role picker)
+  via `lib/appMode.js`. `VITE_LOCAL_DEMO=true` is the evaluator switch: it forces the demo even with Supabase set
+  (no Supabase client is created), first visits open on the GNDEC college with a generated timetable, and api/
+  endpoints skip sign-in but rate-limit each visitor (`demoRateLimit`). Removing it restores sign-in; no data changes.
 
 ## Commands
 ```bash

@@ -43,8 +43,9 @@ const readRole = () => {
 }
 
 /**
- * With Supabase configured, people sign in and their role comes from their profile in the database.
- * Without it, the browser-only demo runs during development (or when VITE_LOCAL_DEMO=true); otherwise nothing.
+ * With Supabase configured, people sign in and their role comes from their profile in the database. The
+ * browser-only demo (role picker) runs during development without Supabase, or whenever VITE_LOCAL_DEMO=true
+ * (the evaluator switch, which overrides sign-in); see lib/appMode.js.
  */
 export default function App() {
   const [prefs, setPrefs] = usePrefs()

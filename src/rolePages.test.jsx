@@ -3,7 +3,7 @@
 import { test, expect, vi } from 'vitest'
 import { renderToString } from 'react-dom/server'
 
-vi.mock('./lib/supabase.js', () => ({ supabase: null, supabaseConfigured: false, localDemoAllowed: true, linkType: '', redirectUrl: () => '' }))
+vi.mock('./lib/supabase.js', () => ({ supabase: null, supabaseConfigured: false, localDemoAllowed: true, evaluatorDemo: false, linkType: '', redirectUrl: () => '' }))
 
 const { gndecCollege } = await import('./data/gndecCollege.js')
 const { normalizeCollege } = await import('./data/departments.js')

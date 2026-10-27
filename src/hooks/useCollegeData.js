@@ -5,6 +5,8 @@ import { gndecCollege } from '../data/gndecCollege.js'
 import { normalizeCollege } from '../data/departments.js'
 import { checkRoom, createBooking, nextWorkingDay, seedBookings } from '../booking.js'
 import { seedRequests } from '../campusGuide.js'
+import { generateCollege } from '../scheduler.js'
+import { evaluatorDemo } from '../lib/supabase.js'
 
 /** This browser's anonymous student id, so a student can see their own space requests (no accounts). */
 export function studentClientId() {
@@ -56,7 +58,21 @@ function write(data) {
 }
 
 export function useCollegeData() {
-  const [data, setData] = useState(() => readStored() ?? emptyCollege())
+  // A first visit to the evaluator demo (VITE_LOCAL_DEMO=true) opens on the GNDEC college, so every role has
+  // something to show; its timetable is generated just after the first paint. Everyone else starts empty.
+  const [start] = useState(() => {
+    const stored = readStored()
+    if (stored) return { data: stored, fresh: false }
+    return evaluatorDemo ? { data: withDemoBookings(gndecCollege()), fresh: true } : { data: emptyCollege(), fresh: false }
+  })
+  const [data, setData] = useState(start.data)
+  useEffect(() => {
+    if (!start.fresh) return
+    const id = setTimeout(() => {
+      setData((d) => (d.timetable || d.previous ? d : { ...d, timetable: { ...generateCollege(d, { seed: 1 }), generatedAt: new Date().toISOString() } }))
+    }, 50)
+    return () => clearTimeout(id)
+  }, [start])
 
   // Autosave. Saved bookings and space requests are the source of truth: they only change through the explicit
   // actions below (which write immediately), so this never overwrites one another tab saved meanwhile.

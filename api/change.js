@@ -132,7 +132,7 @@ export function createHandler(makeClient = () => new Anthropic()) {
       return fail(res, 503, 'The change assistant is not set up yet: add ANTHROPIC_API_KEY to .env.local (or the Vercel project settings).')
     }
     const denied = await checkAccount(req, { adminOnly: true })
-    if (denied) return fail(res, 401, denied)
+    if (denied) return fail(res, denied.status, denied.message)
 
     let body
     try {

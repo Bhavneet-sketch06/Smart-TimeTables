@@ -51,6 +51,14 @@ If nothing fits, the app says why and suggests nearby free times. Confirmed book
 with a booking ID, and appear under **My bookings** (faculty) or **All bookings** (HOD/admin), where they can be
 cancelled. Loading the GNDEC or demo data adds three sample bookings for the next working day.
 
+## Evaluator demo: no sign-in (switch)
+For evaluations, set `VITE_LOCAL_DEMO=true` in Vercel (Project → Settings → Environment Variables, Production) and
+redeploy. The live site then opens without sign-in: the landing page offers Administrator, HOD, Faculty and Student,
+"Switch role" goes back, and a first visit starts with the GNDEC college and its generated timetable. Everything runs
+in the visitor's browser (nothing reaches the shared Supabase data), and Ask AI / Reschedule work, limited to 30 AI
+requests per visitor per 10 minutes (also set a monthly spending limit in the Anthropic Console). To bring sign-in
+back, delete the variable and redeploy: accounts and shared data are untouched.
+
 ## AI change assistant (administrators)
 In the administrator's **Reschedule** tab, type a sudden change in plain words ("Dr. Kapil Sharma is on
 leave this Wednesday", "Convocation on Friday in the first two periods", "Software Lab-I is closed for AC repair").

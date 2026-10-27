@@ -49,7 +49,7 @@ export default async function handler(req, res) {
   }
 
   const denied = await checkAccount(req)
-  if (denied) return fail(res, 401, denied)
+  if (denied) return fail(res, denied.status, denied.message)
 
   let body
   try {

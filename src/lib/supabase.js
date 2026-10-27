@@ -2,17 +2,21 @@
 // public); every permission is enforced by Row Level Security in the database. Never put a secret/service key in a
 // VITE_ variable: Vite copies those into the browser bundle.
 import { createClient } from '@supabase/supabase-js'
+import { appMode } from './appMode.js'
 
 const url = import.meta.env.VITE_SUPABASE_URL
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 
-export const supabaseConfigured = Boolean(url && key)
+/** VITE_LOCAL_DEMO=true: the evaluator demo (no sign-in, role picker) even when Supabase is configured. */
+export const evaluatorDemo = import.meta.env.VITE_LOCAL_DEMO === 'true'
 
-/**
- * Without Supabase settings the old browser-only demo (role picker, data in localStorage) is available during
- * `npm run dev`, or in a build only when VITE_LOCAL_DEMO=true. It never shares data and has no accounts.
- */
-export const localDemoAllowed = !supabaseConfigured && (import.meta.env.DEV || import.meta.env.VITE_LOCAL_DEMO === 'true')
+const mode = appMode({ supabaseConfigured: Boolean(url && key), dev: import.meta.env.DEV, localDemo: evaluatorDemo })
+
+/** Sign-in and shared data are on (see appMode). */
+export const supabaseConfigured = mode === 'accounts'
+
+/** The browser-only demo runs: role picker, data in localStorage, no accounts and nothing shared. */
+export const localDemoAllowed = mode === 'demo'
 
 // Email links land here with "#...&type=invite" (invitation), "type=recovery" (password reset), or "type=signup" /
 // "type=magiclink" (Create account). Read it before the client consumes (and clears) the URL hash, so the app can
