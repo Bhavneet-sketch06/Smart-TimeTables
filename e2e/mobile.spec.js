@@ -40,9 +40,9 @@ test.describe('Phone screens', () => {
     await expect(page.locator('html')).not.toHaveClass(/dark/)
   })
 
-  test('A-01 Live site: Sign in and the theme switch are visible on a phone', async ({ page }) => {
+  test('A-01 Live site: the way in (Sign in, or the demo) and the theme switch are visible on a phone', async ({ page }) => {
     await page.goto('https://smart-time-tables.vercel.app/')
-    await expect(page.getByRole('button', { name: 'Sign in' }).first()).toBeInViewport()
+    await expect(page.getByRole('button', { name: /^(Sign in|Create a timetable)$/ }).first()).toBeInViewport()
     await expect(page.getByRole('button', { name: 'Dark theme' })).toBeInViewport()
     expect(await fitsScreen(page)).toEqual({ headerOk: true, noSideScroll: true })
   })
