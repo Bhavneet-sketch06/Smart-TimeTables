@@ -21,7 +21,8 @@ timetable app. The college's working days, period times, teachers and rooms, eac
 Supported changes:
 - teacher_unavailable / teacher_available: a teacher cannot teach (leave, duty, training) or can again, in given slots
 - block_slots / unblock_slots: periods with no classes for anyone (an event, an assembly, a holiday morning), or allowed again
-- room_out_of_service / room_back_in_service: a room closed for maintenance or repairs, or reopened
+- room_out_of_service / room_back_in_service: a room closed for maintenance or repairs, or reopened. A closure has
+  no days or periods: the room stays out of service until it is reopened, so never ask when or for how long
 
 Rules:
 - Use only ids that appear in <college>. Never invent an id.

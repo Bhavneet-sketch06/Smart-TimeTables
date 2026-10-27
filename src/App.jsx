@@ -252,9 +252,6 @@ function LocalDemoApp({ controls }) {
         <div className="flex w-full items-center justify-between gap-2 px-3 py-2.5 sm:px-6 sm:py-3 lg:px-8">
           <Brand onClick={() => setView('landing')}>
             <RoleBadge role={view} data={data} deptId={effective} />
-            <span className="hidden whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-0.5 text-sm font-medium text-amber-800 lg:inline">
-              Browser-only demo
-            </span>
           </Brand>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {controls}
